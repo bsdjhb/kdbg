@@ -2,22 +2,3 @@ set remotebaud 57600
 set remotetimeout 1
 set complaints 1
 set print pretty
-dir /home/jhb/work/smpng/src/sys/compile/BAZng
-#dir /home/jhb/work/smpng/src/sys/compile/BAR
-dir /home/jhb/work/smpng/src/sys
-define asf
-   set $file = linker_files.tqh_first
-   set $found = 0
-   while ($found == 0)
-     if (*$file->filename == 'v')
-	set $found = 1
-     else
-       set $file = $file->link.tqe_next
-     end
-   end
-   shell /usr/bin/objdump --section-headers sys/modules/vinum/vinum.ko | grep ' .text' | awk '{print "add-symbol-file sys/modules/vinum/vinum.ko \$file->address+0x" $4}' > .asf
-   source .asf
-end
-document asf
-Find the load address of Vinum in the kernel and add the symbols at this address
-end
