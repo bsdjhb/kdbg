@@ -1,0 +1,1004 @@
+# $Yahoo: //depot/jhb/tools/ygdb#26 $
+# General kernel macros
+
+# Macros
+set $TDI_SUSPENDED = 0x1
+set $TDI_SLEEPING = 0x2
+set $TDI_SWAPPED = 0x4
+set $TDI_LOCK = 0x8
+set $TDI_IWAIT = 0x10
+
+set $TDF_SINTR = 0x8
+
+# TID_MAX is a wild guess
+set $PID_MAX = 99999
+set $TID_MAX = 999999
+
+set $P_CONTROLT = 0x2
+set $P_PPWAIT = 0x10
+set $P_HADTHREADS = 0x80
+set $P_SYSTEM = 0x200
+set $P_TRACED = 0x800
+set $P_WEXIT = 0x02000
+set $P_STOPPED_SIG = 0x20000
+set $P_STOPPED_TRACE = 0x40000
+set $P_STOPPED_SINGLE = 0x80000
+set $P_STOPPED = ($P_STOPPED_SIG | $P_STOPPED_TRACE | $P_STOPPED_SINGLE)
+
+set $PS_INMEM = 0x1
+
+set $MTX_UNOWNED = 4
+
+set $VV_ROOT = 0x0001
+set $VV_TEXT = 0x0020
+set $VV_SYSTEM = 0x0080
+set $VI_DOOMED = 0x0080
+set $VI_FREE = 0x0100
+
+set $CTLTYPE = 0xf
+set $CTLTYPE_NODE = 1
+
+set $LK_WAITDRAIN = 0x00080000
+
+# Number of chars output by %p
+set $PTRWIDTH = (sizeof(void *) * 2 + 2)
+
+# Lookup a process specified via $arg0.  We first check to see if it
+# is a valid PID, if not, we assume it is a pointer to a struct proc.
+# If it looks like a PID, we walk the process lists to find it.  The
+# proc pointer is returned in $arg1.
+define lookup_proc
+    set $_pid = (int)$arg0
+    set $arg1 = (struct proc *)$arg0
+    if ($_pid <= $PID_MAX)
+        set $_zomb = 0
+	set $_p = allproc.lh_first
+	while ($_p)
+	    if ($_p->p_pid == $_pid)
+		set $arg1 = $_p
+		set $_p = 0
+	    else
+		set $_p = $_p->p_list.le_next
+		if ($_p == 0 && $_zomb == 0)
+		    set $_p = zombproc.lh_first
+		    set $_zomb = 1
+		end
+	    end
+	end
+    end
+end
+
+# Lookup a thread specified via $arg0.  We walk all the processes and threads
+# looking to see if $arg0 specifies a valid TID.  In addition, if $arg2 is
+# non-zero, then we will check to see if it's a valid PID as well, and if so
+# we return the first thread in the process with that PID.  If it is not a
+# valid tid, then we assume $arg0 is a thread pointer and leave it alone.
+# The thread pointer is returned in $arg1.
+define lookup_thread
+    set $_id = (int)$arg0
+    set $arg1 = (struct thread *)$arg0
+    if ($_id <= $TID_MAX)
+	set $_zomb = 0
+	set $_p = allproc.lh_first
+	while ($_p)
+	    if ($arg2 && $_p->p_pid == $_id)
+		set $arg1 = $_p->p_threads.tqh_first
+		set $_p = 0
+	    else
+		set $_td = $_p->p_threads.tqh_first
+		while ($_td)
+		    if ($_td->td_tid == $_id)
+			set $arg1 = $_td
+			set $_td = 0
+			set $_p = 0
+		    else
+			set $_td = $_td->td_plist.tqe_next
+		    end
+		end
+		if ($_p)
+		    set $_p = $_p->p_list.le_next
+		    if ($_p == 0 && $_zomb == 0)
+			set $_p = zombproc.lh_first
+			set $_zomb = 1
+		    end
+		end
+	    end
+	end
+    end
+end
+
+# formatting helper
+# spaces <count>
+define spaces
+    set $_count = $arg0
+    while (--$_count >= 0)
+	printf " "
+    end
+end
+
+# dumpthread <td> <all>
+# ps helper to display info about a thread
+define dumpthread
+    if ($arg1)
+	set $x = 0
+	printf " %9d              ", $arg0->td_tid
+	if ($arg0->td_state == TDS_RUNNING)
+	    printf " Run    "
+	    set $x = 1
+	end
+	if ($arg0->td_state == TDS_RUNQ)
+	    printf " RunQ   "
+	    set $x = 1
+	end
+	if ($arg0->td_state == TDS_CAN_RUN)
+	    printf " CanRun "
+	    set $x = 1
+	end
+	if ($arg0->td_state == TDS_INACTIVE)
+	    printf " Inactv "
+	    set $x = 1
+	end
+	if ($arg0->td_state == TDS_INHIBITED)
+	    printf " "
+	    set $i = 6
+	    if ($arg0->td_inhibitors & $TDI_LOCK)
+		printf "L"
+		set $i = $i - 1
+	    end
+	    if ($arg0->td_inhibitors & $TDI_SLEEPING)
+		if ($arg0->td_flags & $TDF_SINTR)
+		    printf "S"
+		    set $i = $i - 1
+		else
+		    printf "D"
+		    set $i = $i - 1
+		end
+	    end
+	    if ($arg0->td_inhibitors & $TDI_SWAPPED)
+		printf "W"
+		set $i = $i - 1
+	    end
+	    if ($arg0->td_inhibitors & $TDI_IWAIT)
+		printf "I"
+		set $i = $i - 1
+	    end
+	    if ($arg0->td_inhibitors & $TDI_SUSPENDED)
+		printf "s"
+		set $i = $i - 1
+	    end
+	    while ($i != 0)
+		printf " "
+		set $i = $i - 1
+	    end
+	    printf " "
+	    set $x = 1
+	end
+	if ($x == 0)
+	    printf " ???    "
+	end
+    end
+    if ($arg0->td_inhibitors & $TDI_LOCK)
+	printf "*%-8.8s %p ", $arg0->td_lockname, $arg0->td_blocked
+    else
+	if ($arg0->td_wchan != 0)
+	    printf " %-8.8s %p ", $arg0->td_wmesg, $arg0->td_wchan
+	else
+	    if ($arg0->td_state == TDS_RUNNING)
+		printf " CPU %2d   ", $arg0->td_oncpu
+	    else
+		printf "          "
+	    end
+	    spaces $PTRWIDTH
+	    printf " "
+	end
+    end
+    if ($arg0->td_proc->p_flag & $P_SYSTEM)
+	printf "["
+    end
+    printf "%s", $arg0->td_proc->p_comm
+    if ($arg0->td_proc->p_flag & $P_SYSTEM)
+	printf "]"
+    end
+    printf "\n"
+end
+document dumpthread
+Show one-line summary of a thread's state.
+end
+
+# procstate <p>
+# Helper function for 'ps' to dump process state string
+define procstate
+    # First determine the primary process state
+    if ($arg0->p_state == PRS_NORMAL)
+	if ($arg0->p_flag & $P_STOPPED)
+	    printf "T"
+	else
+	    set $rflag = 0
+	    set $sflag = 0
+	    set $dflag = 0
+	    set $lflag = 0
+	    set $wflag = 0
+	    set $td = $arg0->p_threads.tqh_first
+	    while ($td != 0)
+		if ($td->td_state == TDS_RUNNING || \
+		    $td->td_state == TDS_RUNQ || $td->td_state == TDS_CAN_RUN)
+		    set $rflag = $rflag + 1
+		end
+		if ($td->td_inhibitors & $TDI_LOCK)
+		    set $lflag = $lflag + 1
+		end
+		if ($td->td_inhibitors & $TDI_SLEEPING)
+		    if ($td->td_flags & $TDF_SINTR)
+			set $sflag = $sflag + 1
+		    else
+			set $dflag = $dflag + 1
+		    end
+		end
+		if ($td->td_inhibitors & $TDI_IWAIT)
+		    set $wflag = $wflag + 1
+		end
+		set $td = $td->td_plist.tqe_next
+	    end
+	    if ($rflag)
+		printf "R"
+	    else
+		if ($lflag)
+		    printf "L"
+		else
+		    if ($dflag)
+			printf "D"
+		    else
+			if ($sflag)
+			    printf "S"
+			else
+			    if ($wflag)
+				printf "W"
+			    else
+				printf "?"
+			    end
+			end
+		    end
+		end
+	    end
+	end
+    else
+	if ($arg0->p_state == PRS_NEW)
+	    printf "N"
+	else
+	    if ($arg0->p_state == PRS_ZOMBIE)
+		printf "Z"
+	    else
+		printf "U"
+	    end
+	end
+    end
+
+    # Extra states
+    set $i = 5
+    if (!($arg0->p_sflag & $PS_INMEM))
+	printf "W"
+	set $i = $i - 1
+    end
+    if ($arg0->p_flag & $P_TRACED)
+	printf "X"
+	set $i = $i - 1
+    end
+    if ($arg0->p_flag & $P_WEXIT && $arg0->p_state != PRS_ZOMBIE)
+	printf "E"
+	set $i = $i - 1
+    end
+    if ($arg0->p_flag & $P_PPWAIT)
+	printf "V"
+	set $i = $i - 1
+    end
+    if ($arg0->p_flag & $P_SYSTEM || $p->p_lock > 0)
+	printf "L"
+	set $i = $i - 1
+    end
+    if ($arg0->p_pgrp != 0 && $arg0->p_pgrp->pg_session != 0 && \
+	$arg0->p_pgrp->pg_session->s_leader == $arg0 && $i > 0)
+	printf "s"
+	set $i = $i - 1
+    end
+    if ($arg0->p_flag & $P_CONTROLT && $i > 0)
+	printf "+"
+	set $i = $i - 1
+    end
+    if ($arg0->p_ucred != 0 && $arg0->p_ucred->cr_prison != 0 && $i > 0)
+	printf "J"
+	set $i = $i - 1
+    end
+    while ($i != 0)
+	printf " "
+	set $i = $i - 1
+    end
+end
+
+# dumpproc <proc>
+# ps helper to dump info about a given process
+define dumpproc
+    set $pp = $arg0.p_pptr
+    if ($pp == 0)
+	set $pp = $arg0
+    end
+    if ($arg0.p_ucred == 0)
+	set $uid = 0
+    else
+	set $uid = $arg0.p_ucred->cr_ruid
+    end
+    if ($arg0.p_pgrp == 0)
+	set $pgid = 0
+    else
+	set $pgid = $arg0.p_pgrp->pg_id
+    end
+    printf "%5d %5d %5d %5d ", $arg0.p_pid, $pp->p_pid, $pgid, $uid
+
+    printf " "
+    procstate $arg0
+    printf " "
+    set $x = $arg0.p_flag & $P_HADTHREADS
+    if ($x)
+	printf " (threaded)          %s\n", $arg0.p_comm
+    end
+
+    set $td = $arg0.p_threads.tqh_first
+    while ($td != 0)
+	dumpthread $td $x
+	set $td = $td->td_plist.tqe_next
+    end
+end
+
+# ps: equivalent of the userland command
+define ps
+    set $nproc = nprocs
+    set $p = allproc.lh_first
+    printf "  pid  ppid  pgrp   uid   state   wmesg   "
+    set $foo = ($PTRWIDTH - 5) / 2
+    spaces $foo
+    printf "wchan"
+    set $foo = $PTRWIDTH - 5 - $foo
+    spaces $foo
+    printf " cmd\n"
+    while (--$nproc >= 0)
+	dumpproc $p
+	set $p = $p.p_list.le_next
+	if ($p == 0 && $nproc > 0)
+	    set $p = zombproc.lh_first
+	end
+    end
+end
+document ps
+Show process status without options. 
+end
+
+# qps: "quick" ps skips any single threaded procs that are asleep
+define qps
+    set $nproc = nprocs
+    set $p = allproc.lh_first
+    printf "  pid  ppid  pgrp   uid   state   wmesg   "
+    set $foo = ($PTRWIDTH - 5) / 2
+    spaces $foo
+    printf "wchan"
+    set $foo = $PTRWIDTH - 5 - $foo
+    spaces $foo
+    printf " cmd\n"
+    while (--$nproc >= 0)
+	set $td = $p->p_threads.tqh_first
+	if ($p.p_flag & $P_HADTHREADS || $td->td_state != TDS_INHIBITED || $td->td_inhibitors & $TDI_LOCK)
+	    dumpproc $p
+	end
+	set $p = $p.p_list.le_next
+	if ($p == 0 && $nproc > 0)
+	    set $p = zombproc.lh_first
+	end
+    end
+end
+document qps
+Show process status of non-idle processes without options. 
+end
+
+# dmesg: print msgbuf.  Can take forever.
+define dmesg
+printf "%s", msgbufp->msg_ptr
+end
+document dmesg
+Print the system message buffer (dmesg) This can take a long time due to the time it takes to transmit the data across a serial line and even on a firewire connection the processing time slows it down
+end
+
+# checkmem: check unallocated memory for modifications
+# this assumes that DIAGNOSTIC is set, which causes
+# free memory to be set to 0xdeadc0de
+#
+# Use: checkmem offset length
+define checkmem
+    set $offset = $arg0
+    # XXX sizeof int.   Needs changing for 64 bit machines.
+    # subtract 1 because the last word is always different.
+    set $length = $arg1 / 4 - 1
+    set $word = 0
+    while ($word < $length)
+	if ((int *) $offset) [$word] != 0xdeadc0de
+	    printf "invalid word 0x%x at 0x%x\n", ((int *) $offset) [$word], \
+		&((int *) $offset) [$word]
+	end
+	set $word = $word + 1
+    end
+end
+
+document checkmem
+Check unallocated memory for modifications  This assumes that DIAGNOSTIC is set which causes free memory to be set to 0xdeadc0de.
+end
+
+define kldstat
+    set $kld = linker_files.tqh_first
+    printf "Id Refs Address    Size     Name\n"
+    while ($kld != 0)
+	printf "%2d %4d 0x%08x %-8x %s\n", \
+	    $kld->id, $kld->refs, $kld->address, $kld->size, $kld->filename
+	set $kld = $kld->link.tqe_next
+    end
+end
+ 
+document kldstat
+Lists the modules that were loaded when the kernel crashed.
+end
+ 
+define kldstat-v
+    set $kld = linker_files.tqh_first
+    printf "Id Refs Address    Size     Name\n"
+    while ($kld != 0)
+  	printf "%2d %4d 0x%08x %-8x %s\n", \
+	    $kld->id, $kld->refs, $kld->address, $kld->size, $kld->filename
+	printf "        Contains modules:\n"
+	printf "                Id Name\n"
+	set $module = $kld->modules.tqh_first
+	while ($module != 0)
+	    printf "                %2d %s\n", $module->id, $module->name
+	    set $module = $module->link.tqe_next
+	end
+	set $kld = $kld->link.tqe_next
+    end
+end
+
+define mtx_owner
+    if (((struct mtx *)$arg0)->mtx_lock == $MTX_UNOWNED)
+	printf "unowned\n"
+    else
+	set $td = (struct thread *)(((struct mtx *)$arg0)->mtx_lock & ~0x3)
+	printf "td: %p\n", $td
+	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
+    end
+end
+
+document mtx_owner
+Displays the owner of a given mutex
+end
+
+define lockchain
+    set $count = 20
+    lookup_thread $arg0 $td 1
+    while ($td != 0)
+	printf " thread %d (pid %d, %s) ", $td->td_tid, $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
+	if ($td->td_state == TDS_INHIBITED)
+	    if ($td->td_inhibitors & $TDI_LOCK)
+		set $ts = $td->td_blocked
+		set $lock = $ts->ts_lockobj
+		printf "blocked on lock %p \"%s\"\n", $lock, $lock->lo_name
+		set $td = $ts->ts_owner
+		if ($td == $arg0 || --$count == 0)
+		    printf " DEADLOCK\n"
+		    set $td = 0
+		end
+	    else
+		printf "inhibited\n"
+		set $td = 0
+	    end
+	else
+	    if ($td->td_state == TDS_INACTIVE)
+	        printf "is inactive\n"
+	    else
+		if ($td->td_state == TDS_CAN_RUN)
+		    printf "can run\n"
+		else
+		    if ($td->td_state == TDS_RUNQ)
+		        printf "is on a run queue\n"
+		    else
+			if ($td->td_state == TDS_RUNNING)
+			    printf "running on CPU %d\n", $td->td_oncpu
+			else
+			    printf "unknown state!\n"
+			end
+		    end
+		end
+	    end
+	    set $td = 0
+	end
+    end
+end
+
+document lockchain
+Displays the chain of contested locks a thread is blocked on
+end
+
+define allchains
+    set $p = allproc.lh_first
+    set $i = 1
+    while ($p != 0)
+	set $td2 = $p->p_threads.tqh_first
+	while ($td2 != 0)
+	    if ($td2->td_inhibitors & $TDI_LOCK && \
+		$td2->td_contested.lh_first == 0)
+		printf "chain %d:\n", $i
+		lockchain $td2
+		set $i = $i + 1
+	    end
+	    set $td2 = $td2->td_plist.tqe_next
+	end
+	set $p = $p->p_list.le_next
+    end
+end
+
+document allchains
+Displays all the contested lock thread chains in the system
+end
+
+# printpcpu <struct pcpu *>
+# helper function for pcpu and allpcpu
+define printpcpu
+    printf "cpuid        = %d\n", $arg0->pc_cpuid
+    printf "curthread    = "
+    if ($arg0->pc_curthread != 0)
+	printf "%p: pid %d \"%s\"\n", $arg0->pc_curthread, \
+	    $arg0->pc_curthread->td_proc->p_pid, \
+	    $arg0->pc_curthread->td_proc->p_comm
+    else
+	printf "none\n"
+    end
+    printf "curpcb       = %p\n", $arg0->pc_curpcb
+    printf "fpcurthread  = "
+    if ($arg0->pc_fpcurthread != 0)
+	printf "%p: pid %d \"%s\"\n", $arg0->pc_fpcurthread, \
+	    $arg0->pc_fpcurthread->td_proc->p_pid, \
+	    $arg0->pc_fpcurthread->td_proc->p_comm
+    else
+	printf "none\n"
+    end
+    printf "idlethread   = "
+    if ($arg0->pc_idlethread != 0)
+	printf "%p: pid %d \"%s\"\n", $arg0->pc_idlethread, \
+	    $arg0->pc_idlethread->td_proc->p_pid, \
+	    $arg0->pc_idlethread->td_proc->p_comm
+    else
+	printf "none\n"
+    end
+end
+
+define pcpu
+    set $p = cpuhead.slh_first
+    while ($p != 0)
+	if ($p->pc_cpuid == $arg0)
+	    printpcpu $p
+	    set $p = 0
+	else
+	    set $p = $p->pc_allcpu.sle_next
+	end
+    end
+end
+
+document pcpu
+Display per-CPU information for a specified CPU.
+end
+
+define allpcpu
+    set $p = cpuhead.slh_first
+    while ($p != 0)
+	printpcpu $p
+	printf "\n"
+	set $p = $p->pc_allcpu.sle_next
+    end
+end
+
+document allpcpu
+Display per-CPU information for all CPUs.
+end
+
+define lockmgr_owner
+    if (((struct lock *)$arg0)->lk_exclusivecount != 0)
+	set $td = ((struct lock *)$arg0)->lk_lockholder
+	printf "td: %p\n", $td
+	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
+    end
+    if (((struct lock *)$arg0)->lk_sharecount != 0)
+	printf "share count: %d\n", ((struct lock *)$arg0)->lk_sharecount
+    end    
+end
+
+document lockmgr_owner
+Displays the owner of a given lockmgr lock
+end
+
+# vtypename <type>
+# helper function for vprint
+define vtypename
+    if ($arg0 == VNON)
+	printf "VNON"
+    else
+	if ($arg0 == VREG)
+	    printf "VREG"
+	else
+	    if ($arg0 == VDIR)
+		printf "VDIR"
+	    else
+		if ($arg0 == VBLK)
+		    printf "VBLK"
+		else
+		    if ($arg0 == VCHR)
+			printf "VCHR"
+		    else
+			if ($arg0 == VLNK)
+			    printf "VLNK"
+			else
+			    if ($arg0 == VSOCK)
+				printf "VSOCK"
+			    else
+				if ($arg0 == VFIFO)
+				    printf "VFIFO"
+				else
+				    if ($arg0 == VBAD)
+					printf "VBAD"
+				    else
+					if ($arg0 == VMARKER)
+					    printf "VMARKER"
+					else
+					    printf "V??:%d", $arg0
+					end
+				    end
+				end
+			    end
+			end
+		    end
+		end
+	    end
+	end
+    end
+end
+
+# vprint <vp>
+# helper function to dump info about a vnode
+define vprint
+    set $vp = (struct vnode *)$arg0
+    printf "%p: ", $vp
+    printf "tag %s, type ", $vp->v_tag
+    vtypename $vp->v_type
+    printf "\n"
+    printf "    usecount %d, writecount %d, refcount %d mountedhere %p\n", \
+	$vp->v_usecount, $vp->v_writecount, $vp->v_holdcnt, $vp->v_un.vu_mount
+    printf "    flags ("
+    set $_pipe = 0
+    if ($vp->v_vflag & $VV_ROOT)
+	printf "VV_ROOT"
+	set $_pipe = 1
+    end
+    if ($vp->v_vflag & $VV_TEXT)
+	if ($_pipe)
+	    printf "|"
+	end
+	printf "VV_TEXT"
+	set $_pipe = 1
+    end
+    if ($vp->v_vflag & $VV_SYSTEM)
+	if ($_pipe)
+	    printf "|"
+	end
+	printf "VV_SYSTEM"
+	set $_pipe = 1
+    end
+    if ($vp->v_iflag & $VI_DOOMED)
+	if ($_pipe)
+	    printf "|"
+	end
+	printf "VI_DOOMED"
+	set $_pipe = 1
+    end
+    if ($vp->v_iflag & $VI_FREE)
+	if ($_pipe)
+	    printf "|"
+	end
+	printf "VI_FREE"
+	set $_pipe = 1
+    end
+    printf ")"
+    if ($vp->v_interlock.mtx_lock != $MTX_UNOWNED)
+	printf " VI_LOCKed"
+    end
+    printf "\n"
+    set $_vobj = $vp->v_bufobj.bo_object
+    if ($_vobj != 0)
+	printf "    v_object %p ref %d pages %d\n", $_vobj, $_vobj->ref_count, \
+	    $_vobj->resident_page_count
+    end
+    printf "    "
+    # lockmgr_printinfo()
+    set $_lkp = $vp->v_vnlock
+    if ($_lkp->lk_sharecount)
+	printf "lock type %s: SHARED (count %d)", $_lkp->lk_wmesg, \
+	    $_lkp->lk_sharecount
+    else
+	if ($_lkp->lk_exclusivecount)
+	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
+		$_lkp->lk_wmesg, $_lkp->lk_exclusivecount, \
+		$_lkp->lk_lockholder, $_lkp->lk_lockholder->td_proc->p_pid
+	else
+	    printf "lock type %s: UNLOCKED", $_lkp->lk_wmesg
+	end
+    end
+    if ($_lkp->lk_waitcount > 0)
+	printf " with %d pending", $_lkp->lk_waitcount
+    end
+    printf "\n"
+    # XXX: no VOP_PRINT
+end
+
+define lockedvnodes
+    printf "Locked vnodes\n"
+    set $mp = mountlist.tqh_first
+    while ($mp != 0)
+	set $lvp = $mp->mnt_nvnodelist.tqh_first
+	while ($lvp != 0)
+	    if ($lvp->v_type != VMARKER && \
+		($lvp->v_vnlock->lk_exclusivecount != 0 || \
+		$lvp->v_vnlock->lk_sharecount != 0))
+		vprint $lvp
+	    end
+	    set $lvp = $lvp->v_nmntvnodes.tqe_next
+	end
+	set $mp = $mp->mnt_list.tqe_next
+    end
+end
+
+document lockedvnodes
+List all of the locked vnodes in the system
+end
+
+# helper functions for sleepchain, return success or failure in $arg1 and
+# if ok, owner in $arg2, $arg0 is thread
+define lk_chain
+    set $lkp = (struct lock *)$arg0->td_wchan
+    # imperfect test to see if the wchan is a lockmgr lock maybe
+    if ($lkp->lk_wmesg != $arg0->td_wmesg)
+	# it might be sleeping on &lkp->lk_flags during a drain
+	set $lkp = (struct lock *)((char *)$lkp - (int)(&((struct lock *)0)->lk_flags))
+	if ($lkp->lk_wmesg != $arg0->td_wmesg || !($lkp->lk_flags & $LK_WAITDRAIN))
+	    set $lkp = 0
+	end
+    end
+    if ($lkp)
+	set $arg1 = 1
+	printf "blocked on lk \"%s\" ", $lkp->lk_wmesg
+	if ($lkp->lk_sharecount)
+	    printf "SHARED (count %d)", $lkp->lk_sharecount
+	    set $arg2 = 0
+	else
+	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
+	    set $arg2 = $lkp->lk_lockholder
+	end
+    else
+	set $arg1 = 0
+    end
+end
+
+define sx_chain
+    set $cv = (struct cv *)$arg0->td_wchan
+    if ($cv->cv_description == $arg0->td_wmesg)
+	set $sx = (struct sx *)((char *)$cv - (int)(&((struct sx *)0)->sx_excl_cv))
+	if ($sx->sx_object.lo_class != &lock_class_sx || $sx->sx_excl_wcnt == 0)
+	    set $sx = (struct sx *)((char *)$cv - (int)(&((struct sx *)0)->sx_shrd_cv))
+	    if ($sx->sx_object.lo_class != &lock_class_sx || $sx->sx_shrd_wcnt == 0)
+		set $sx = 0
+	    end
+	end
+	if ($sx)
+	    set $arg1 = 1
+	    printf "blocked on sx \"%s\" ", $arg0->td_wmesg
+	    if ($sx->sx_cnt >= 0)
+		printf "SLOCK (count %d)", $sx->sx_cnt
+		set $arg2 = 0
+	    else
+		printf "XLOCK"
+		set $arg2 = $sx->sx_xholder
+	    end
+	else
+	    set $arg1 = 0
+	end
+    else
+	set $arg1 = 0
+    end
+end
+
+define sleepchain
+    set $count = 20
+    lookup_thread $arg0 $td 1
+    while ($td != 0)
+	printf " thread %d (pid %d, %s) ", $td->td_tid, $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
+        if ($td->td_wchan != 0)
+	    lk_chain $td $ok $owner
+	    if ($ok == 0)
+		sx_chain $td $ok $owner
+	    end
+	    if ($ok != 0)
+		set $td = $owner
+		if ($td == $arg0 || --$count == 0)
+		    printf "\n DEADLOCK"
+		    set $td = 0
+		end
+	    else
+		printf "non-lock sleep"
+		set $td = 0
+	    end
+	else
+	    set $td = 0
+	end
+	printf "\n"
+    end	
+end
+
+document sleepchain
+Like lockchain but for sleep locks
+end
+
+# sysctl_oid name namelen
+def sysctl_oid
+    set $oid = sysctl__children.slh_first
+    set $index = 0
+    while ($oid != 0 && $index < $arg1)
+	if ($oid->oid_number == $arg0[$index])
+	    set $index = $index + 1
+	    printf "%6d: %s\n", $oid->oid_number, $oid->oid_name
+	    if (($oid->oid_kind & $CTLTYPE) == $CTLTYPE_NODE)
+		if ($oid->oid_handler != 0)
+		    set $oid = 0
+		else
+		    set $oid = ((struct sysctl_oid_list *)$oid->oid_arg1)->slh_first
+		end
+	    else
+		set $oid = 0
+	    end
+	else
+	    set $oid = $oid->oid_link.sle_next
+	end
+    end
+end
+
+document sysctl_oid
+Try to lookup the name of a sysctl OID.
+end
+
+def memstat
+    printf "%8d K Active (%2d%%)\n", cnt.v_active_count * cnt.v_page_size / 1024, cnt.v_active_count * 100 / cnt.v_page_count
+    printf "%8d K Inact  (%2d%%)\n", cnt.v_inactive_count * cnt.v_page_size / 1024, cnt.v_inactive_count * 100 / cnt.v_page_count
+    printf "%8d K Wired  (%2d%%)\n", cnt.v_wire_count * cnt.v_page_size / 1024, cnt.v_wire_count * 100 / cnt.v_page_count
+    printf "%8d K Cache  (%2d%%)\n", cnt.v_cache_count * cnt.v_page_size / 1024, cnt.v_cache_count * 100 / cnt.v_page_count
+    printf "%8d K Buf\n", bufspace / $div
+    printf "%8d K Free   (%2d%%)\n", cnt.v_free_count * cnt.v_page_size / 1024, cnt.v_free_count * 100 / cnt.v_page_count
+end
+
+document memstat
+Show top-like memory usage summary
+end
+
+def swapinfo
+    printf "Device          1K-blocks     Used    Avail Capacity\n"
+    set $swp = swtailq.tqh_first
+    while ($swp != 0)
+	if ($swp->sw_dev == 0)
+	    printf "%-15s", "<NFSfile>"
+	else
+	    printf "/dev/%-10s", $swp->sw_vp->v_un.vu_cdev->si_name
+	end
+	printf " %9u", $swp->sw_nblks * (4096 / 1024)
+	printf " %8u", $swp->sw_used * (4096 / 1024)
+	printf " %8u", ($swp->sw_nblks - $swp->sw_used) * (4096 / 1024)
+	printf " %5.0f%c\n", ($swp->sw_used * 100.0 ) / $swp->sw_nblks, '%'
+	set $swp = $swp->sw_list.tqe_next
+    end
+end
+
+document swapinfo
+Output similar to swapinfo(8)
+end
+
+define devstate
+    if ($arg0->state == DS_NOTPRESENT)
+	printf "NOT PRESENT"
+    else
+	if ($arg0->state == DS_ALIVE)
+	    printf "ALIVE      "
+	else
+	    if ($arg0->state == DS_ATTACHED)
+		printf "ATTACHED   "
+	    else
+		if ($arg0->state == DS_BUSY)
+		    printf "BUSY: %-5d", $arg0->busy
+		else
+		    printf "???: %-6d", $arg0->state
+		end
+	    end
+	end
+    end
+end
+
+# List device info as <name:20> <state:11> <softc> <ivars>
+define lsdev
+    printf "        name            state    "
+    set $foo = ($PTRWIDTH - 5) / 2
+    set $bar = $PTRWIDTH - 5 - $foo
+    spaces $foo
+    printf "softc"
+    spaces $bar
+    printf " "
+    spaces $foo
+    printf "ivars\n"
+    set $foo = $PTRWIDTH - 4
+    set $dev = bus_data_devices->tqh_first
+    while ($dev != 0)
+        if ($dev->nameunit)
+	    printf "%-20s ", $dev->nameunit
+	else
+	    printf "(null)               "
+	end
+	devstate $dev
+	if ($dev->softc)
+	    printf " %p", $dev->softc
+	else
+	    printf " NULL"
+	    spaces $foo
+	end
+	if ($dev->ivars)
+	    printf " %p", $dev->ivars
+	else
+	    printf " NULL"
+	    spaces $foo
+	end
+	printf "\n"
+	set $dev = $dev->devlink.tqe_next
+    end
+end
+
+document lsdev
+Show new-bus devices.
+end
+
+# Show the new-bus device tree
+define devinfo
+    set $indent = 0
+    set $dev = root_bus
+    set $ignore = 0
+    while ($dev != 0)
+	if ($dev->nameunit != 0 && $ignore == 0)
+	    spaces $indent
+	    printf "%s\n", $dev->nameunit
+	end
+	if ($dev->children.tqh_first != 0 && $ignore == 0)
+	    set $dev = $dev->children.tqh_first
+	    set $indent = $indent + 1
+	    set $ignore = 0
+	else
+	    if ($dev->link.tqe_next != 0)
+		set $dev = $dev->link.tqe_next
+		set $ignore = 0
+	    else
+		set $indent = $indent - 1
+		set $dev = $dev->parent
+		set $ignore = 1
+	    end
+	end
+    end
+end
+
+document devinfo
+Show new-bus heirarchy similar to devinfo(8).
+end
