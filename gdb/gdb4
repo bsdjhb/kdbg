@@ -1,4 +1,4 @@
-# $Yahoo: //depot/jhb/tools/ygdb4#4 $
+# $Yahoo: //depot/jhb/tools/gdb4#1 $
 # General kernel macros
 
 # Macros
@@ -331,7 +331,8 @@ end
 
 define lockmgr_owner
     if (((struct lock *)$arg0)->lk_exclusivecount != 0)
-	set $p = ((struct lock *)$arg0)->lk_lockholder
+	set $pid = ((struct lock *)$arg0)->lk_lockholder
+	lookup_proc $pid $p
 	printf "p: %p\n", $p
 	printf "pid: %d, p_comm: %s\n", $p->p_pid, $p->p_comm
     end
@@ -342,6 +343,64 @@ end
 
 document lockmgr_owner
 Displays the owner of a given lockmgr lock
+end
+
+# vtagname <tag>
+# helper function for vprint
+define vtagname
+    if ($arg0 == VT_NON)
+	printf "VT_NON"
+    else
+	if ($arg0 == VT_UFS)
+	    printf "VT_UFS"
+	else
+	    if ($arg0 == VT_NFS)
+		printf "VT_NFS"
+	    else
+		if ($arg0 == VT_MFS)
+		    printf "VT_MFS"
+		else
+		    if ($arg0 == VT_FDESC)
+			printf "VT_FDESC"
+		    else
+			if ($arg0 == VT_PORTAL)
+			    printf "VT_PORTAL"
+			else
+			    if ($arg0 == VT_NULL)
+				printf "VT_NULL"
+			    else
+				if ($arg0 == VT_UMAP)
+				    printf "VT_UMAP"
+				else
+				    if ($arg0 == VT_KERNFS)
+					printf "VT_KERNFS"
+				    else
+					if ($arg0 == VT_PROCFS)
+					    printf "VT_PROCFS"
+					else
+					    if ($arg0 == VT_ISOFS)
+						printf "VT_ISOFS"
+					    else
+						if ($arg0 == VT_UNION)
+						    printf "VT_UNION"
+						else
+						    if ($arg0 == VT_MSDOSFS)
+							printf "VT_MSDOSFS"
+						    else
+							printf "VT_??:%d", $arg0
+						    end
+						end
+					    end
+					end
+				    end
+				end
+			    end
+			end
+		    end
+		end
+	    end
+	end
+    end
 end
 
 # vtypename <type>
@@ -391,11 +450,13 @@ end
 define vprint
     set $vp = (struct vnode *)$arg0
     printf "%p: ", $vp
-    printf "tag %s, type ", $vp->v_tag
+    printf "tag "
+    vtagname $vp->v_tag
+    printf " type "
     vtypename $vp->v_type
     printf "\n"
-    printf "    usecount %d, writecount %d, refcount %d mountedhere %p\n", \
-	$vp->v_usecount, $vp->v_writecount, $vp->v_holdcnt, $vp->v_un.vu_mount
+    printf "    usecount %d, writecount %d, refcount %d\n", \
+	$vp->v_usecount, $vp->v_writecount, $vp->v_holdcnt
     printf "    flags ("
     set $_pipe = 0
     if ($vp->v_flag & $VROOT)
@@ -432,7 +493,7 @@ define vprint
     end
     printf ")"
     printf "\n"
-    set $_vobj = $vp->v_bufobj.bo_object
+    set $_vobj = $vp->v_object
     if ($_vobj != 0)
 	printf "    v_object %p ref %d pages %d\n", $_vobj, $_vobj->ref_count, \
 	    $_vobj->resident_page_count
@@ -440,16 +501,20 @@ define vprint
     printf "    "
     # lockmgr_printinfo()
     set $_lkp = $vp->v_vnlock
+    printf "lock type "
+    if ($_lkp->lk_wmesg)
+	printf "%s: ", $_lkp->lk_wmesg
+    else
+	printf "(null): "
+    end
     if ($_lkp->lk_sharecount)
-	printf "lock type %s: SHARED (count %d)", $_lkp->lk_wmesg, \
-	    $_lkp->lk_sharecount
+	printf "SHARED (count %d)", $_lkp->lk_sharecount
     else
 	if ($_lkp->lk_exclusivecount)
-	    printf "lock type %s: EXCL (count %d) by proc %p (pid %d)", \
-		$_lkp->lk_wmesg, $_lkp->lk_exclusivecount, \
-		$_lkp->lk_lockholder, $_lkp->lk_lockholder->p_pid
+	    printf "EXCL (count %d) by proc %d", $_lkp->lk_exclusivecount, \
+		$_lkp->lk_lockholder
 	else
-	    printf "lock type %s: UNLOCKED", $_lkp->lk_wmesg
+	    printf "UNLOCKED"
 	end
     end
     if ($_lkp->lk_waitcount > 0)
@@ -465,7 +530,7 @@ define lockedvnodes
     while ($mp != 0)
 	set $lvp = $mp->mnt_nvnodelist.tqh_first
 	while ($lvp != 0)
-	    if ($lvp->v_type != VMARKER && \
+	    if ($lvp->v_vnlock != 0 && \
 		($lvp->v_vnlock->lk_exclusivecount != 0 || \
 		$lvp->v_vnlock->lk_sharecount != 0))
 		vprint $lvp
@@ -676,4 +741,39 @@ end
 
 document devinfo
 Show new-bus heirarchy similar to devinfo(8).
+end
+
+define ip
+    set $_ip = (u_int32_t)$arg0
+    printf "%d.%d.%d.%d\n", $_ip >> 24, $_ip >> 16 & 0xff, \
+	$_ip >> 8 & 0xff, $_ip & 0xff
+end
+
+document ip
+Print IPv4 address in dotted-decimal format.
+end
+
+define sin
+    set $_sin = (struct sockaddr_in *)$arg0
+    set $_port = $_sin->sin_port >> 8 | ($_sin->sin_port & 0xff) << 8
+    printf "IP: "
+    ip $_sin->sin_addr.s_addr
+    printf "port: %d\n", $_port
+end
+
+document sin
+Display IP and port of a AF_INET socket address.
+end
+
+define prison_ips
+    printf "host: %s\n", $arg0->pr_host
+    set $_i = 0
+    while ($_i < $arg0->pr_nips)
+	ip $arg0->pr_ips[$_i]->pi_ip
+	set $_i = $_i + 1
+    end
+end
+
+document prison_ips
+Display IP addresses of a JAILED_VIPS prison.
 end

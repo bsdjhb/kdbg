@@ -1,0 +1,216 @@
+# $Yahoo: //depot/jhb/tools/gdb6.amd64#1 $
+# amd64-specific kernel macros
+
+set $DMAP_MIN_ADDRESS = 0xffffff0000000000
+set $DMAP_MAX_ADDRESS = 0xffffff8000000000
+set $PG_PS = 0x80
+set $PG_V = 0x1
+set $PG_PS_FRAME = 0xfffffffe00000
+set $PG_FRAME = 0xffffffffff000
+set $PDMAP = 0xffff804000000000
+set $PTMAP = 0xffff800000000000
+set $PDRMASK = 0x1fffff
+set $PAGE_MASK = 0xfff
+set $PDE_MASK = 0x7ffffff
+set $PTE_MASK = 0xfffffffff
+set $PML4SHIFT = 0x27
+set $PDPSHIFT = 0x1e
+set $PDRSHIFT = 0x15
+set $PAGE_SHIFT = 0xc
+set $NPML4EPGSHIFT = 0x9
+set $NPDPEPGSHIFT = 0x9
+set $NPDEPGSHIFT = 0x9
+set $NPTEPGSHIFT = 0x9
+
+define pmap_pml4e
+    set $_pm = (struct pmap *)$arg0
+    set $_va = (long)$arg1
+    if ($arg0 == 0)
+        set $_pm = &kernel_pmap_store
+    end
+    set $arg2 = $_pm->pm_pml4[(($_va >> $PML4SHIFT) & (((long)1 << $NPML4EPGSHIFT) - 1))]
+end
+
+document pmap_pml4e
+Given a pmap and virtual address, lookup the value of the pml4 entry and
+store it in the 3rd arg.
+end
+
+define phys_to_dmap
+    set $arg1 = (long)$arg0 | $DMAP_MIN_ADDRESS
+end
+
+document phys_to_dmap
+Given a physical address, return the corresponding virtual address in the
+direct map in the 2nd arg.
+end
+
+define pmap_pdpe
+    pmap_pml4e $arg0 $arg1 $_pml4e
+    if (!($_pml4e & $PG_V))
+	set $arg2 = 0
+    else
+	set $_va = (long)$arg1
+	set $_temp = (long)$_pml4e & $PG_FRAME
+	phys_to_dmap $_temp $__pdpe
+	set $arg2 = ((pdp_entry_t *)$__pdpe)[(($_va >> $PDPSHIFT) & \
+	    (((long)1 << $NPDPEPGSHIFT) - 1))]
+    end
+end
+
+document pmap_pdpe
+Given a pmap and virtual address, lookup the value of the pdp entry and
+store it in the 3rd arg.
+end
+
+define pmap_pde
+    pmap_pdpe $arg0 $arg1 $_pdpe
+    if (!($_pdpe & $PG_V))
+	set $arg2 = 0
+    else
+	set $_va = (long)$arg1
+	set $_temp = (long)$_pdpe & $PG_FRAME
+	phys_to_dmap $_temp $__pde
+	set $arg2 = ((pd_entry_t *)$__pde)[(($_va >> $PDRSHIFT) & \
+	    (((long)1 << $NPDEPGSHIFT) - 1))]
+    end
+end
+
+document pmap_pde
+Given a pmap and virtual address, lookup the value of the page directory entry
+and store it in the 3rd arg.
+end
+
+define pmap_pte
+    pmap_pde $arg0 $arg1 $_pde
+    if (!($_pde & $PG_V))
+	set $arg2 = 0
+    else
+        if ($_pde & $PG_PS)
+	    set $arg2 = $_pde
+	else
+	    set $_va = (long)$arg1
+	    set $_temp = (long)$_pde & $PG_FRAME
+	    phys_to_dmap $_temp $__pte
+	    set $arg2 = ((pt_entry_t *)$__pte)[(($_va >> $PAGE_SHIFT) & \
+		(((long)1 << $NPTEPGSHIFT) - 1))]
+        end
+    end
+end
+
+document pmap_pte
+Given a pmap and virtual address, lookup the value of the page table entry
+and store it in the 3rd arg.
+end
+
+define pmap_kextract
+    set $va = (long)$arg0
+    set $pa = -1
+    if ($va >= $DMAP_MIN_ADDRESS && $va <= $DMAP_MAX_ADDRESS)
+	set $pa = $va - $DMAP_MIN_ADDRESS
+    else
+	pmap_pde 0 $arg0 $pde
+	if ($pde & $PG_V)
+	    if ($pde & $PG_PS)
+		set $pa = ($pde & $PG_PS_FRAME) | ($va & $PDRMASK)
+	    else
+		pmap_pte 0 $arg0 $pte
+		if ($pte & $PG_V)
+		    set $pa = ($pte & $PG_FRAME) | \
+			($va & $PAGE_MASK)
+		end
+	    end
+	end
+    end
+    if ($pa == -1)
+	printf "Invalid or unmapped address\n"
+    else
+	printf "KVA %p => 0x%lx\n", $va, $pa
+    end
+end
+
+document pmap_kextract
+Map a kernel virtual address to a physical address on amd64.
+'kextract' in kgdb is more portable.
+end
+
+define pmap_extract
+    set $va = (long)$arg1
+    set $pa = -1
+    pmap_pde $arg0 $arg1 $pde
+    if ($pde & $PG_V)
+	if ($pde & $PG_PS)
+	    set $pa = ($pde & $PG_PS_FRAME) | ($va & $PDRMASK)
+	else
+	    pmap_pte $arg0 $arg1 $pte
+	    if ($pte & $PG_V)
+		set $pa = ($pte & $PG_FRAME) | ($va & $PAGE_MASK)
+	    end
+	end
+    end
+    if ($pa == -1)
+	printf "Invalid or unmapped address\n"
+    else
+	printf "VA %p => 0x%lx\n", $va, $pa
+    end
+end
+
+document pmap_extract
+Map a user virtual address to a physical address on amd64.
+end
+
+define pmap_pages
+    set $pm = (struct pmap *)$arg0
+    set $sva = $arg1
+    set $eva = $arg2
+    set $pv = $pm->pm_pvlist.tqh_first
+    while ($pv != 0)
+	if ($pv->pv_va >= $sva && $pv->pv_va <= $eva)
+	    printf "%08llx: page XXX\n", $pv->pv_va
+	end
+	set $pv = $pv->pv_plist.tqe_next
+    end
+end
+
+document pmap_pages
+Given a pmap, a starting virtual address, and an ending virtual address,
+list all the pages that fall in the range.
+end
+
+# Do a backtrace given %rip and %rbp as args
+define bt
+    set $_rip = $arg0
+    set $_rbp = $arg1
+    set $i = 0
+    while ($_rbp != 0 || $_rip != 0)
+	printf "%2d: pc ", $i
+	if ($_rip != 0)
+		x/1i $_rip
+	else
+		printf "\n"
+	end
+	if ($_rbp == 0)
+	    set $_rip = 0
+	else
+	    set $fr = (struct amd64_frame *)$_rbp
+	    set $_rbp = $fr->f_frame
+	    set $_rip = $fr->f_retaddr
+	    set $i = $i + 1
+	end
+    end
+end
+
+document bt
+Given values for %rip and %rbp, perform a manual backtrace.
+end
+
+define btf
+    bt $arg0.tf_rip $arg0.tf_rbp
+end
+
+document btf
+Do a manual backtrace from a specified trapframe.
+end
+
+directory /sys/amd64/include
+directory /sys/amd64/compile/GENERIC
