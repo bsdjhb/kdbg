@@ -1,4 +1,4 @@
-# $Yahoo: //depot/jhb/tools/gdb6#2 $
+# $Yahoo: //depot/jhb/tools/gdb6#11 $
 # General kernel macros
 
 # Macros
@@ -25,9 +25,35 @@ set $P_STOPPED_TRACE = 0x40000
 set $P_STOPPED_SINGLE = 0x80000
 set $P_STOPPED = ($P_STOPPED_SIG | $P_STOPPED_TRACE | $P_STOPPED_SINGLE)
 
-set $PS_INMEM = 0x1
+if (osrelease[0] >= '7')
+    set $P_INMEM = 0x10000000
+else
+    set $PS_INMEM = 0x1
+end
+
+if (osrelease[0] >= '7')
+	set $LO_CLASSMASK = 0x0f000000
+	set $LO_CLASSSHIFT = 24
+end
+
+if (osrelease[0] >= '8')
+    set $LK_SHARE = 0x01
+    set $LK_SHARED_WAITERS = 0x02
+    set $LK_EXCLUSIVE_WAITERS = 0x04
+    set $LK_FLAGMASK = 0x07
+    set $LK_SHARERS_SHIFT = 3
+    set $LK_UNLOCKED = ((0) << $LK_SHARERS_SHIFT | $LK_SHARE)
+else
+    set $LK_WAITDRAIN = 0x00080000
+end
 
 set $MTX_UNOWNED = 4
+
+if (osrelease[0] > '6' || osrelease[2] >= '3')
+    set $SX_LOCK_SHARED = 0x01
+    set $SX_LOCK_FLAGMASK = 0x0f
+    set $SX_SHARERS_SHIFT = 4
+end
 
 set $VV_ROOT = 0x0001
 set $VV_TEXT = 0x0020
@@ -37,8 +63,6 @@ set $VI_FREE = 0x0100
 
 set $CTLTYPE = 0xf
 set $CTLTYPE_NODE = 1
-
-set $LK_WAITDRAIN = 0x00080000
 
 set $M_EXT = 0x0001
 set $M_PKTHDR = 0x0002
@@ -219,7 +243,15 @@ define dumpthread
     if ($arg0->td_proc->p_flag & $P_SYSTEM)
 	printf "["
     end
-    printf "%s", $arg0->td_proc->p_comm
+    if (osrelease[0] >= '7')
+	if ($arg0->td_name[0] != '\0')
+	    printf "%s", $arg0->td_name
+	else
+	    printf "%s", $arg0->td_proc->p_comm
+	end
+    else
+	printf "%s", $arg0->td_proc->p_comm
+    end
     if ($arg0->td_proc->p_flag & $P_SYSTEM)
 	printf "]"
     end
@@ -309,9 +341,16 @@ define procstate
 
     # Extra states
     set $i = 5
-    if (!($arg0->p_sflag & $PS_INMEM))
-	printf "W"
-	set $i = $i - 1
+    if (osrelease[0] >= '7')
+	if (!($arg0->p_flag & $P_INMEM))
+	    printf "W"
+	    set $i = $i - 1
+	end
+    else
+	if (!($arg0->p_sflag & $PS_INMEM))
+	    printf "W"
+	    set $i = $i - 1
+ 	end
     end
     if ($arg0->p_flag & $P_TRACED)
 	printf "X"
@@ -662,7 +701,7 @@ end
 define pcpu
     set $p = cpuhead.slh_first
     while ($p != 0)
-	if ($__i386__ && $p == 0xffc00000)
+	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
 	end
 	if ($p->pc_cpuid == $arg0)
@@ -681,7 +720,7 @@ end
 define allpcpu
     set $p = cpuhead.slh_first
     while ($p != 0)
-	if ($__i386__ && $p == 0xffc00000)
+	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
 	end
 	printpcpu $p
@@ -694,7 +733,7 @@ document allpcpu
 Display per-CPU information for all CPUs.
 end
 
-define lockmgr_owner
+define lockmgr_owner_old7
     if (((struct lock *)$arg0)->lk_exclusivecount != 0)
 	set $td = ((struct lock *)$arg0)->lk_lockholder
 	printf "td: %p\n", $td
@@ -703,7 +742,30 @@ define lockmgr_owner
     end
     if (((struct lock *)$arg0)->lk_sharecount != 0)
 	printf "share count: %d\n", ((struct lock *)$arg0)->lk_sharecount
-    end    
+    end 
+end
+
+define lockmgr_owner_new8
+    if (((struct lock *)$arg0)->lk_lock & $LK_SHARE)
+	if (((struct lock *)$arg0)->lk_lock & ~$LK_FLAGMASK != 0)
+	    printf "share count: %d\n", (((struct lock *)$arg0)->lk_lock & \
+		~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
+	end
+    else
+	set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
+	    ~$LK_FLAGMASK)
+	printf "td: %p\n", $td
+	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
+    end
+end
+
+define lockmgr_owner
+    if (osrelease[0] >= '8')
+	lockmgr_owner_new8 $arg0
+    else
+	lockmgr_owner_old7 $arg0
+    end
 end
 
 document lockmgr_owner
@@ -756,6 +818,58 @@ define vtypename
     end
 end
 
+define lockmgr_printinfo_old7
+    if ($arg0->lk_sharecount)
+	printf "lock type %s: SHARED (count %d)", $arg0->lk_wmesg, \
+	    $arg0->lk_sharecount
+    else
+	if ($arg0->lk_exclusivecount)
+	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
+		$arg0->lk_wmesg, $arg0->lk_exclusivecount, \
+		$arg0->lk_lockholder, $arg0->lk_lockholder->td_proc->p_pid
+	else
+	    printf "lock type %s: UNLOCKED", $arg0->lk_wmesg
+	end
+    end
+    if ($arg0->lk_waitcount > 0)
+	printf " with %d pending", $arg0->lk_waitcount
+    end
+end
+
+define lockmgr_printinfo_new8
+    if ($arg0->lk_lock == $LK_UNLOCKED)
+	printf "lock type %s: UNLOCKED", $arg0->lock_object.lo_name
+    else
+	if ($arg0->lk_lock & $LK_SHARE)
+	    printf "lock type %s: SHARED (count %d)", \
+		$arg0->lock_object.lo_name, \
+		($arg0->lk_lock & ~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
+	else
+	    set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
+	    printf "lock type %s: EXCL by thread %p (pid %d)", \
+		$arg0->lock_object.lo_name, $_td, $_td->td_proc->p_pid
+	end
+    end
+    if ($arg0->lk_lock & $LK_EXCLUSIVE_WAITERS)
+	printf " with exclusive waiters pending"
+	if ($arg0->lk_lock & $LK_SHARED_WAITERS)
+	    printf "\n"
+	end
+    else
+	if ($arg0->lk_lock & $LK_SHARED_WAITERS)
+	    printf " with shared waiters pending"
+	end
+    end
+end
+
+define lockmgr_printinfo
+    if (osrelease[0] >= '8')
+	lockmgr_printinfo_new8 $arg0
+    else
+	lockmgr_printinfo_old7 $arg0
+    end
+end
+
 # vprint <vp>
 # helper function to dump info about a vnode
 define vprint
@@ -784,23 +898,7 @@ define vprint
 	    $_vobj->resident_page_count
     end
     printf "    "
-    # lockmgr_printinfo()
-    set $_lkp = $vp->v_vnlock
-    if ($_lkp->lk_sharecount)
-	printf "lock type %s: SHARED (count %d)", $_lkp->lk_wmesg, \
-	    $_lkp->lk_sharecount
-    else
-	if ($_lkp->lk_exclusivecount)
-	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
-		$_lkp->lk_wmesg, $_lkp->lk_exclusivecount, \
-		$_lkp->lk_lockholder, $_lkp->lk_lockholder->td_proc->p_pid
-	else
-	    printf "lock type %s: UNLOCKED", $_lkp->lk_wmesg
-	end
-    end
-    if ($_lkp->lk_waitcount > 0)
-	printf " with %d pending", $_lkp->lk_waitcount
-    end
+    lockmgr_printinfo $vp->v_vnlock
     printf "\n"
     # XXX: no VOP_PRINT
 end
@@ -811,10 +909,17 @@ define lockedvnodes
     while ($mp != 0)
 	set $lvp = $mp->mnt_nvnodelist.tqh_first
 	while ($lvp != 0)
-	    if ($lvp->v_type != VMARKER && \
-		($lvp->v_vnlock->lk_exclusivecount != 0 || \
-		$lvp->v_vnlock->lk_sharecount != 0))
-		vprint $lvp
+	    if ($lvp->v_type != VMARKER)
+		if (osrelease[0] >= '8')
+		    if ($lvp->v_vnlock->lk_lock != $LK_UNLOCKED)
+			vprint $lvp
+		    end
+		else
+		    if ($lvp->v_vnlock->lk_exclusivecount != 0 || \
+		    $lvp->v_vnlock->lk_sharecount != 0))
+			vprint $lvp
+		    end
+		end
 	    end
 	    set $lvp = $lvp->v_nmntvnodes.tqe_next
 	end
@@ -826,9 +931,18 @@ document lockedvnodes
 List all of the locked vnodes in the system
 end
 
+define lock_class
+    if (osrelease[0] < '7')
+	set $arg1 = $arg0->lo_class
+    else
+	set $arg1 = lock_classes[($arg0->lo_flags & $LO_CLASSMASK) >> \
+	    $LO_CLASSSHIFT]
+    end
+end
+
 # helper functions for sleepchain, return success or failure in $arg1 and
 # if ok, owner in $arg2, $arg0 is thread
-define lk_chain
+define lk_chain_old7
     set $lkp = (struct lock *)$arg0->td_wchan
     # imperfect test to see if the wchan is a lockmgr lock maybe
     if ($lkp->lk_wmesg != $arg0->td_wmesg)
@@ -855,7 +969,34 @@ define lk_chain
     end
 end
 
-define sx_chain
+define lk_chain_new8
+    set $lk = (struct lock *)$arg0->td_wchan
+    lock_class (&$lk->lock_object) $_lc
+    if ($_lc != &lock_class_lockmgr)
+	set $arg1 = 0
+    else
+	set $arg1 = 1
+	printf "blocked on lk \"%s\" ", $arg0->td_wmesg
+	if ($lk->lk_lock & $LK_SHARE)
+	    printf "SHARED (count %d)", ($lk->lk_lock & ~$LK_FLAGMASK) >> \
+		$LK_SHARERS_SHIFT
+	    set $arg2 = 0
+	else
+	    printf "EXCL"
+	    set $arg2 = (struct thread *)($lk->lk_lock & ~$LK_FLAGMASK)
+	end
+    end
+end
+
+define lk_chain
+    if (osrelease[0] >= '8')
+	lk_chain_new8 $arg0 $arg1 $arg2
+    else
+	lk_chain_old7 $arg0 $arg1 $arg2
+    end
+end
+
+define sx_chain_old6
     set $cv = (struct cv *)$arg0->td_wchan
     if ($cv->cv_description == $arg0->td_wmesg)
 	set $sx = (struct sx *)((char *)$cv - \
@@ -883,6 +1024,33 @@ define sx_chain
 	end
     else
 	set $arg1 = 0
+    end
+end
+
+define sx_chain_new6
+    set $sx = (struct sx *)$arg0->td_wchan
+    lock_class (&$sx->lock_object) $_lc
+    if ($_lc != &lock_class_sx || $sx->lock_object.lo_name != $arg0->td_wmesg)
+	set $arg1 = 0
+    else
+	set $arg1 = 1
+	printf "blocked on sx \"%s\" ", $arg0->td_wmesg
+	if ($sx->sx_lock & $SX_LOCK_SHARED)
+	    printf "SLOCK (count %d)", ($sx->sx_lock & ~$SX_LOCK_FLAGMASK) >> \
+		$SX_SHARERS_SHIFT
+	    set $arg2 = 0
+	else
+	    printf "XLOCK"
+	    set $arg2 = (struct thread *)($sx->sx_lock & ~$SX_LOCK_FLAGMASK)
+	end
+    end
+end
+
+define sx_chain
+    if (osrelease[0] == '6' && osrelease[2] < '3')
+	sx_chain_old6 $arg0 $arg1 $arg2
+    else
+	sx_chain_new6 $arg0 $arg1 $arg2
     end
 end
 
@@ -965,17 +1133,17 @@ from the top of the tree.
 end
 
 def memstat
-    printf "%8d K Active (%2d%%)\n", cnt.v_active_count * cnt.v_page_size / \
-	1024, cnt.v_active_count * 100 / cnt.v_page_count
-    printf "%8d K Inact  (%2d%%)\n", cnt.v_inactive_count * cnt.v_page_size / \
-	1024, cnt.v_inactive_count * 100 / cnt.v_page_count
-    printf "%8d K Wired  (%2d%%)\n", cnt.v_wire_count * cnt.v_page_size / \
-	1024, cnt.v_wire_count * 100 / cnt.v_page_count
-    printf "%8d K Cache  (%2d%%)\n", cnt.v_cache_count * cnt.v_page_size / \
-	1024, cnt.v_cache_count * 100 / cnt.v_page_count
-    printf "%8d K Buf\n", bufspace / $div
-    printf "%8d K Free   (%2d%%)\n", cnt.v_free_count * cnt.v_page_size / \
-	1024, cnt.v_free_count * 100 / cnt.v_page_count
+    printf "%8d K Active (%2d%c)\n", cnt.v_active_count * cnt.v_page_size / \
+	1024, cnt.v_active_count * 100 / cnt.v_page_count, '%'
+    printf "%8d K Inact  (%2d%c)\n", cnt.v_inactive_count * cnt.v_page_size / \
+	1024, cnt.v_inactive_count * 100 / cnt.v_page_count, '%'
+    printf "%8d K Wired  (%2d%c)\n", cnt.v_wire_count * cnt.v_page_size / \
+	1024, cnt.v_wire_count * 100 / cnt.v_page_count, '%'
+    printf "%8d K Cache  (%2d%c)\n", cnt.v_cache_count * cnt.v_page_size / \
+	1024, cnt.v_cache_count * 100 / cnt.v_page_count, '%'
+    printf "%8d K Buf\n", bufspace / 1024
+    printf "%8d K Free   (%2d%c)\n", cnt.v_free_count * cnt.v_page_size / \
+	1024, cnt.v_free_count * 100 / cnt.v_page_count, '%'
 end
 
 document memstat
@@ -1397,29 +1565,52 @@ document devinfo
 Show new-bus heirarchy similar to devinfo(8).
 end
 
-# Dump an mbuf chain
-define mbuf
-    set $m = (struct mbuf *)$arg0
-    if ($m->m_hdr.mh_flags & $M_PKTHDR)
-        set $h = $m->M_dat.MH.MH_pkthdr
-	printf "packet: %d bytes", $h.len
+# Pring a single mbuf
+define dumpmbuf
+    printf "%p: %d bytes", $arg0, $arg0->m_hdr.mh_len
+    if ($arg0->m_hdr.mh_flags & $M_EXT)
+	printf " ext %p", $arg0->M_dat.MH.MH_dat.MH_ext.ext_buf
+    end
+    if ($arg0->m_hdr.mh_flags & $M_PKTHDR)
+        set $h = $arg0->M_dat.MH.MH_pkthdr
+	printf " packet: %d bytes", $h.len
 	if ($h.rcvif != 0)
 	    printf " received via %s", $h.rcvif->if_xname
 	end
-	printf "\n"
     end
+    printf "\n"
+end
+
+# Dump an mbuf chain
+define mbuf
+    set $m = (struct mbuf *)$arg0
     while ($m != 0)
-        printf "%p: %d bytes", $m, $m->m_hdr.mh_len
-        if ($m->m_hdr.mh_flags & $M_EXT)
-	    printf " ext %p", $m->M_dat.MH.MH_dat.MH_ext.ext_buf
-	end
-	printf "\n"
+	dumpmbuf $m
         set $m = $m->m_hdr.mh_next
     end
 end
 
 document mbuf
 Display all the mbufs in an mbuf chain.
+end
+
+# Dump a list of packets
+define packets
+    set $mp = (struct mbuf *)$arg0
+    while ($mp != 0)
+	printf "chain %p:\n", $mp
+	set $m = $mp
+	while ($m != 0)
+	        printf "  "
+	 	dumpmbuf $m
+		set $m = $m->m_hdr.mh_next
+	end
+	set $mp = $mp->m_hdr.mh_nextpkt
+    end
+end
+
+document packets
+Display all the mbuf chains in a list of packets.
 end
 
 define semu_list
@@ -1437,6 +1628,9 @@ set $DTYPE_FIFO = 4
 set $DTYPE_KQUEUE = 5
 set $DTYPE_CRYPTO = 6
 set $DTYPE_MQUEUE = 7
+set $DTYPE_SHM = 8
+set $DTYPE_SEM = 9
+set $DTYPE_PTS = 10
 
 define file_type
     if ($arg0->f_type == 0)
@@ -1463,7 +1657,19 @@ define file_type
 				if ($arg0->f_type == $DTYPE_MQUEUE)
 				    printf "mqueue"
 				else
-				    printf "???   "
+				    if ($arg0->f_type == $DTYPE_SHM)
+					printf "psxshm"
+				    else
+					if ($arg0->f_type == $DTYPE_SEM)
+					    printf "psxsem"
+					else
+					    if ($arg0->f_type == $DTYPE_PTS)
+						printf "pts   "
+					    else
+						printf "???   "
+					    end
+					end
+				    end
 				end
 			    end
 			end
@@ -1718,7 +1924,7 @@ define runtds
     printf "CPU ticks pri    tid     pid   cmd\n"
     set $p = cpuhead.slh_first
     while ($p != 0)
-	if ($__i386__ && $p == 0xffc00000)
+	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
 	end
 	printf "%3d %5d ", $p->pc_cpuid, ticks - $p->pc_switchticks
@@ -1989,4 +2195,37 @@ end
 
 document mntopts
 Display the mount options for a specified mount.
+end
+
+define vpath
+    set $_vp = (struct vnode *)$arg0
+    while ($_vp != 0)
+	printf "%p: ", $_vp
+	if ($_vp == rootvnode)
+	    printf "/"
+	    set $_vp = 0
+	else
+	    if ($_vp->v_vflag & $VV_ROOT)
+		printf "<mount point>"
+		set $_vp = $_vp->v_mount->mnt_vnodecovered
+	    else
+		set $_ncp = $_vp->v_cache_dst.tqh_first
+		if ($_ncp != 0)
+		    set $_i = 0
+		    while ($_i < $_ncp.nc_nlen)
+			printf "%c", $_ncp.nc_name[$_i]
+			set $_i = $_i + 1
+		    end
+		    set $_vp = $_ncp->nc_dvp
+		else
+		    set $_vp = 0
+		end
+	    end
+	end
+	printf "\n"
+    end
+end
+
+document vpath
+Walk the namecache to lookup the pathname of a vnode.
 end
