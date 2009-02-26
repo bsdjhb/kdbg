@@ -11,6 +11,7 @@ set $PDMAP = 0xffff804000000000
 set $PTMAP = 0xffff800000000000
 set $PDRMASK = 0x1fffff
 set $PAGE_MASK = 0xfff
+set $PAGE_SIZE = 0x1000
 set $PDE_MASK = 0x7ffffff
 set $PTE_MASK = 0xfffffffff
 set $PML4SHIFT = 0x27

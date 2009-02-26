@@ -47,6 +47,9 @@ else
     set $LK_WAITDRAIN = 0x00080000
 end
 
+set $MAP_ENTRY_IS_SUB_MAP = 0x0002
+set $MAP_ENTRY_NOFAULT = 0x0010
+
 set $MTX_UNOWNED = 4
 
 if (osrelease[0] > '6' || osrelease[2] >= '3')
@@ -2228,4 +2231,135 @@ end
 
 document vpath
 Walk the namecache to lookup the pathname of a vnode.
+end
+
+define kqueue
+    set $_kq = (struct kqueue *)$arg0
+    set $_i = 0
+    while ($_i < $kq->kq_knlistsize)
+	set $_kn = $kq->kq_knlist[$_i].slh_first
+	if ($_kn != 0)
+	    printf "fd %d:\n", $_i
+	    while ($_kn != 0)
+		printf "  filter %d flags %d udata %p\n", \
+		    $_kn->kn_kevent.filter, $_kn->kn_kevent.flags, \
+		    $_kn->kn_kevent.udata
+		set $_kn = $_kn->kn_link.sle_next
+	    end
+	end
+	set $_i = $_i + 1
+    end
+end
+
+document kqueue
+Enumerate the knotes belong to a kqueue.
+end
+
+# <start> <end> <entry>
+define kmap_entry
+    printf "%lx - %lx ", $arg0, $arg1
+    if ($arg2->eflags & $MAP_ENTRY_IS_SUB_MAP)
+	set $_submap = $arg2->object.sub_map
+	if ($_submap == kmem_map)
+	    printf "kmem_map"
+	else
+	    if ($_submap == pipe_map)
+		printf "pipe_map"
+	    else
+		if ($_submap == exec_map)
+		    printf "exec_map"
+		else
+		    if ($_submap->header.next->object.sub_map == buffer_map)
+			printf "buffer_map + pager_map"
+		    else
+			printf "map %p", $_submap
+		    end
+		end
+	    end
+	end
+    else
+	if ($arg2->object.vm_object != 0)
+	    set $_obj = $arg2->object.vm_object
+	    if ($_obj == &kernel_object_store)
+		printf "kmem_alloc() / contigmalloc()"
+	    else
+		printf "object %p", $_obj
+	    end
+	else
+	    if ($arg2->eflags & $MAP_ENTRY_NOFAULT)
+		printf "kmem_alloc_nofault() (kstack/mapdev)"
+	    else
+		printf "anon"
+	    end
+	end
+    end
+    printf "\n"
+end
+
+define kvm
+    set $_entry = kernel_map->header.next
+    set $_i = 0
+    set $_swapstart = swap_zone->uz_keg->uk_kva
+    set $_swapend = $_swapstart + swap_zone->uz_keg->uk_maxpages * $PAGE_SIZE
+    if (mp_ncpus > 1)
+	# XXX - amd64 only
+	set $_bootstacks_start = (long)bootstacks[1]
+	set $_bootstacks_size = (long)bootstacks[2] - (long)bootstacks[1]
+	set $_bootstacks_end = (long)bootstacks[mp_ncpus - 1] + $_bootstacks_size
+    else
+	set $_bootstacks_start = 0
+	set $_bootstacks_end = 0
+    end
+    if ($_entry->start != kernel_map->header.start)
+	printf "%lx - %lx ----\n", kernel_map->header.start, $_entry->start
+    end
+    while ($_i < kernel_map.nentries)
+	if ($_i == 0)
+	    printf "%lx - %lx text/data/bss\n", $_entry->start, (long)&_end
+	    printf "%lx - %lx bootstrap data\n", (long)&_end, $_entry->end
+	else
+	    if ($_swapstart >= $_entry->start && $_swapend <= $_entry->end)
+		if ($_swapstart != $_entry->start)
+		    kmap_entry $_entry->start $_swapstart $_entry
+		end
+		printf "%lx - %lx swap zone\n", $_swapstart, $_swapend
+		if ($_swapend != $_entry->end)
+		    kmap_entry $_swapend $_entry->end $_entry
+		end
+	    else
+		if ($_entry->start == callout)
+		    printf "%lx - %lx callouts\n", (long)callout, (long)swbuf
+		    printf "%lx - %lx swbuf\n", (long)swbuf, (long)buf
+		    printf "%lx - %lx buf\n", (long)buf, $_entry->end
+		else
+		    if ($_bootstacks_start >= $_entry->start && \
+			$_bootstacks_end <= $_entry->end)
+			if ($_bootstacks_start != $_entry->start)
+			    kmap_entry $_entry->start $_bootstacks_start $_entry
+			end
+			printf "%lx - %lx AP stacks\n", $_bootstacks_start, \
+			    $_bootstacks_end
+			if ($_bootstacks_end != $_entry->end)
+			    kmap_entry $_bootstacks_end $_entry->end $_entry
+			end
+		    else
+			kmap_entry $_entry->start $_entry->end $_entry
+		    end
+		end
+	    end
+	end
+	if ($_entry->next != &kernel_map.header && \
+	    $_entry->next->start != $_entry->end)
+	    printf "%lx - %lx ----\n", $_entry->end, $_entry->next->start
+	end
+	set $_entry = $_entry->next
+	set $_i = $_i + 1
+    end
+    if (kernel_map->header.prev->end != kernel_vm_end)
+	printf "%lx - %lx ----\n", kernel_map->header.prev->end, kernel_vm_end
+    end
+end
+
+document kvm
+List the map top-level map entries in the kernel map.
 end

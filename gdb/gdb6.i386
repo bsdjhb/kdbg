@@ -8,6 +8,7 @@ set $PG_FRAME = 0xfffff000
 set $PTMAP = 0x9fc00000
 set $PDRMASK = 0x1fffff
 set $PAGE_MASK = 0xfff
+set $PAGE_SIZE = 0x1000
 set $PDRSHIFT = 0x15
 set $PAGE_SHIFT = 0xc
 
