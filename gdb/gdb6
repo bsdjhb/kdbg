@@ -2299,8 +2299,15 @@ end
 define kvm
     set $_entry = kernel_map->header.next
     set $_i = 0
-    set $_swapstart = swap_zone->uz_keg->uk_kva
-    set $_swapend = $_swapstart + swap_zone->uz_keg->uk_maxpages * $PAGE_SIZE
+    if (osrelease[0] < '8')
+        set $_swapkeg = swap_zone->uz_keg
+	set $_callout = callout
+    else
+        set $_swapkeg = swap_zone->uz_kegs.lh_first->kl_keg
+	set $_callout = cc_cpu[0].cc_callout
+    end
+    set $_swapstart = $_swapkeg->uk_kva
+    set $_swapend = $_swapstart + $_swapkeg->uk_maxpages * $PAGE_SIZE
     if (mp_ncpus > 1)
 	# XXX - amd64 only
 	set $_bootstacks_start = (long)bootstacks[1]
@@ -2314,7 +2321,7 @@ define kvm
 	printf "%lx - %lx ----\n", kernel_map->header.start, $_entry->start
     end
     while ($_i < kernel_map.nentries)
-	if ($_i == 0)
+	if (&_end >= $_entry->start && &_end <= $_entry->end)
 	    printf "%lx - %lx text/data/bss\n", $_entry->start, (long)&_end
 	    printf "%lx - %lx bootstrap data\n", (long)&_end, $_entry->end
 	else
@@ -2327,8 +2334,8 @@ define kvm
 		    kmap_entry $_swapend $_entry->end $_entry
 		end
 	    else
-		if ($_entry->start == callout)
-		    printf "%lx - %lx callouts\n", (long)callout, (long)swbuf
+		if ($_entry->start == $_callout)
+		    printf "%lx - %lx callouts\n", (long)$_callout, (long)swbuf
 		    printf "%lx - %lx swbuf\n", (long)swbuf, (long)buf
 		    printf "%lx - %lx buf\n", (long)buf, $_entry->end
 		else
@@ -2355,7 +2362,7 @@ define kvm
 	set $_entry = $_entry->next
 	set $_i = $_i + 1
     end
-    if (kernel_map->header.prev->end != kernel_vm_end)
+    if (kernel_map->header.prev->end < kernel_vm_end)
 	printf "%lx - %lx ----\n", kernel_map->header.prev->end, kernel_vm_end
     end
 end
