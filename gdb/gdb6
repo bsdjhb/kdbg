@@ -963,7 +963,7 @@ end
 
 # helper functions for sleepchain, return success or failure in $arg1 and
 # if ok, owner in $arg2, $arg0 is thread
-define lk_chain_old7
+define lk_chain_old6
     set $lkp = (struct lock *)$arg0->td_wchan
     # imperfect test to see if the wchan is a lockmgr lock maybe
     if ($lkp->lk_wmesg != $arg0->td_wmesg)
@@ -990,6 +990,24 @@ define lk_chain_old7
     end
 end
 
+define lk_chain_old7
+    set $lkp = (struct lock *)$arg0->td_wchan
+    lock_class (&$lkp->lk_object) $_lc
+    if ($_lc != &lock_class_lockmgr)
+	set $arg1 = 0
+    else
+	set $arg1 = 1
+	printf "blocked on lk \"%s\" ", $lkp->lk_object.lo_name
+	if ($lkp->lk_sharecount)
+	    printf "SHARED (count %d)", $lkp->lk_sharecount
+	    set $arg2 = 0
+	else
+	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
+	    set $arg2 = $lkp->lk_lockholder
+	end
+    end
+end
+
 define lk_chain_new8
     set $lk = (struct lock *)$arg0->td_wchan
     lock_class (&$lk->lock_object) $_lc
@@ -1013,7 +1031,11 @@ define lk_chain
     if (osrelease[0] >= '8')
 	lk_chain_new8 $arg0 $arg1 $arg2
     else
-	lk_chain_old7 $arg0 $arg1 $arg2
+	if (osrelease[0] == '7')
+	    lk_chain_old7 $arg0 $arg1 $arg2
+	else
+	    lk_chain_old6 $arg0 $arg1 $arg2
+	end
     end
 end
 
