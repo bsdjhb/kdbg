@@ -31,6 +31,12 @@ else
     set $PS_INMEM = 0x1
 end
 
+if (osrelease[0] >= '8')
+    set $prison0 = &prison0
+else
+    set $prison0 = 0
+end
+
 if (osrelease[0] >= '7')
 	set $LO_CLASSMASK = 0x0f000000
 	set $LO_CLASSSHIFT = 24
@@ -394,7 +400,7 @@ define procstate
 	printf "+"
 	set $i = $i - 1
     end
-    if ($arg0->p_ucred != 0 && $arg0->p_ucred->cr_prison != 0 && $i > 0)
+    if ($arg0->p_ucred != 0 && $arg0->p_ucred->cr_prison != $prison0 && $i > 0)
 	printf "J"
 	set $i = $i - 1
     end
