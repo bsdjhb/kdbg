@@ -1,4 +1,4 @@
-# $Yahoo: //depot/jhb/tools/gdb6.amd64#1 $
+# $Id$
 # amd64-specific kernel macros
 
 set $DMAP_MIN_ADDRESS = 0xffffff0000000000
@@ -236,6 +236,30 @@ end
 
 document btf
 Do a manual backtrace from a specified trapframe.
+end
+
+define irqs
+    set $e = event_list->tqh_first
+    while ($e != 0)
+	if ($e->ie_source != 0 && $e->ie_handlers.tqh_first != 0)
+	    set $src = (struct intsrc *)$e->ie_source
+	    if ($src->is_pic->pic_enable_source == &ioapic_enable_source)
+		set $_cpu = ((struct ioapic_intsrc *)$src)->io_cpu
+	    else
+		if ($src->is_pic->pic_enable_source == &msi_enable_source)
+		    set $_cpu = ((struct msi_intsrc *)$src)->msi_cpu
+		else
+		    set $_cpu = 0
+		end
+	    end
+	    printf "CPU %d: %s\n", $_cpu, $e->ie_fullname
+	end
+	set $e = $e->ie_list.tqe_next
+    end
+end
+
+document irqs
+Dump list of IRQs with associated CPU.
 end
 
 directory /sys/amd64/include

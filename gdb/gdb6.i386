@@ -1,7 +1,11 @@
-# $Yahoo: //depot/jhb/tools/gdb6.i386#1 $
-# amd64-specific kernel macros
+# $Id$
+# i386-specific kernel macros
 
+set $PG_PDE_PAT = 0x1000
+set $PG_PTE_PAT = 0x80
 set $PG_PS = 0x80
+set $PG_NC_PCD = 0x10
+set $PG_NC_PWT = 0x8
 set $PG_V = 0x1
 set $PG_PS_FRAME = 0xffe00000
 set $PG_FRAME = 0xfffff000
@@ -61,7 +65,7 @@ define pmap_kextract
 end
 
 document pmap_kextract
-Map a kernel virtual address to a physical address on amd64.
+Map a kernel virtual address to a physical address on i386.
 'kextract' in kgdb is more portable.
 end
 
@@ -87,9 +91,30 @@ define pmap_extract
 end
 
 document pmap_extract
-Map a user virtual address to a physical address on amd64.
+Map a user virtual address to a physical address on i386.
 end
 
+define rawpte
+    set $va = (long)$arg1
+    set $pte = 0
+    pmap_pde $arg0 $arg1 $pde
+    if (($pde & ($PG_V | $PG_PS)) == $PG_V)
+	pmap_pte $arg0 $arg1 $pte
+    end
+    if ($pte == 0)
+	printf "VA %p => PDE 0x%lx\n", $va, $pde
+	set $_pat = $pde & ($PG_PDE_PAT | $PG_NC_PCD | $PG_NC_PWT)
+    else
+	printf "VA %p => PTE 0x%lx\n", $va, $pte
+	set $_pat = $pte & ($PG_PTE_PAT | $PG_NC_PCD | $PG_NC_PWT)
+    end
+    printf "PAT bits: 0x%lx\n", $_pat
+end
+
+document rawpte
+Display the raw PTE/PDE for a given virtual address.
+end
+    
 define pmap_pages
     set $pm = (struct pmap *)$arg0
     set $sva = $arg1
@@ -141,6 +166,30 @@ end
 
 document btf
 Do a manual backtrace from a specified trapframe.
+end
+
+define irqs
+    set $e = event_list->tqh_first
+    while ($e != 0)
+	if ($e->ie_source != 0 && $e->ie_handlers.tqh_first != 0)
+	    set $src = (struct intsrc *)$e->ie_source
+	    if ($src->is_pic->pic_enable_source == &ioapic_enable_source)
+		set $_cpu = ((struct ioapic_intsrc *)$src)->io_cpu
+	    else
+		if ($src->is_pic->pic_enable_source == &msi_enable_source)
+		    set $_cpu = ((struct msi_intsrc *)$src)->msi_cpu
+		else
+		    set $_cpu = 0
+		end
+	    end
+	    printf "CPU %d: %s\n", $_cpu, $e->ie_fullname
+	end
+	set $e = $e->ie_list.tqe_next
+    end
+end
+
+document irqs
+Dump list of IRQs with associated CPU.
 end
 
 directory /sys/i386/include

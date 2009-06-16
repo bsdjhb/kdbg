@@ -1,4 +1,4 @@
-# $Yahoo: //depot/jhb/tools/gdb6#11 $
+# $Id$
 # General kernel macros
 
 # Macros
@@ -48,15 +48,29 @@ else
 end
 
 set $MAP_ENTRY_IS_SUB_MAP = 0x0002
+set $MAP_ENTRY_COW = 0x0004
+set $MAP_ENTRY_NEEDS_COPY = 0x0008
 set $MAP_ENTRY_NOFAULT = 0x0010
 
 set $MTX_UNOWNED = 4
+
+set $OBJT_DEFAULT = 0
+set $OBJT_SWAP = 1
+set $OBJT_VNODE = 2
+set $OBJT_DEVICE = 3
+set $OBJT_PHYS = 4
+set $OBJT_DEAD = 5
+set $OBJT_SG = 6
 
 if (osrelease[0] > '6' || osrelease[2] >= '3')
     set $SX_LOCK_SHARED = 0x01
     set $SX_LOCK_FLAGMASK = 0x0f
     set $SX_SHARERS_SHIFT = 4
 end
+
+set $VM_PROT_READ = 0x01
+set $VM_PROT_WRITE = 0x02
+set $VM_PROT_EXECUTE = 0x04
 
 set $VV_ROOT = 0x0001
 set $VV_TEXT = 0x0020
@@ -90,7 +104,7 @@ define lookup_proc
     set $_pid = (unsigned)$arg0
     set $arg1 = (struct proc *)$arg0
     if ($_pid <= $PID_MAX)
-        set $_zomb = 0
+	set $_zomb = 0
 	set $_p = allproc.lh_first
 	while ($_p)
 	    if ($_p->p_pid == $_pid)
@@ -622,13 +636,13 @@ define lockchain
 	    end
 	else
 	    if ($td->td_state == TDS_INACTIVE)
-	        printf "is inactive\n"
+		printf "is inactive\n"
 	    else
 		if ($td->td_state == TDS_CAN_RUN)
 		    printf "can run\n"
 		else
 		    if ($td->td_state == TDS_RUNQ)
-		        printf "is on a run queue\n"
+			printf "is on a run queue\n"
 		    else
 			if ($td->td_state == TDS_RUNNING)
 			    printf "running on CPU %d\n", $td->td_oncpu
@@ -822,16 +836,20 @@ define vtypename
 end
 
 define lockmgr_printinfo_old7
+    if (osrelease[0] == '7')
+	set $_name = $arg0->lk_object.lo_name
+    else
+	set $_name = $arg0->lk_wmesg
+    end
     if ($arg0->lk_sharecount)
-	printf "lock type %s: SHARED (count %d)", $arg0->lk_wmesg, \
-	    $arg0->lk_sharecount
+	printf "lock type %s: SHARED (count %d)", $_name, $arg0->lk_sharecount
     else
 	if ($arg0->lk_exclusivecount)
 	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
-		$arg0->lk_wmesg, $arg0->lk_exclusivecount, \
-		$arg0->lk_lockholder, $arg0->lk_lockholder->td_proc->p_pid
+		$_name, $arg0->lk_exclusivecount, $arg0->lk_lockholder, \
+		$arg0->lk_lockholder->td_proc->p_pid
 	else
-	    printf "lock type %s: UNLOCKED", $arg0->lk_wmesg
+	    printf "lock type %s: UNLOCKED", $_name
 	end
     end
     if ($arg0->lk_waitcount > 0)
@@ -919,7 +937,7 @@ define lockedvnodes
 		    end
 		else
 		    if ($lvp->v_vnlock->lk_exclusivecount != 0 || \
-		    $lvp->v_vnlock->lk_sharecount != 0))
+			$lvp->v_vnlock->lk_sharecount != 0)
 			vprint $lvp
 		    end
 		end
@@ -1061,7 +1079,7 @@ define sleepchain
     set $count = 20
     lookup_thread $arg0 $td 1
     while ($td != 0)
-        if ($td->td_wchan != 0)
+	if ($td->td_wchan != 0)
 	    printf " thread %d (pid %d, %s) ", $td->td_tid, \
 		$td->td_proc->p_pid, $td->td_proc->p_comm
 	    sx_chain $td $ok $owner
@@ -1120,7 +1138,7 @@ end
 # sysctl_nodes list
 def sysctl_nodes
     if ($arg0 == 0)
-        set $oid = sysctl__children.slh_first
+	set $oid = sysctl__children.slh_first
     else
 	set $oid = ((struct sysctl_oid_list *)((struct sysctl_oid *)$arg0)->oid_arg1)->slh_first
     end
@@ -1510,7 +1528,7 @@ define lsdev
     set $foo = $PTRWIDTH - 4
     set $dev = bus_data_devices->tqh_first
     while ($dev != 0)
-        if ($dev->nameunit)
+	if ($dev->nameunit)
 	    printf "%-20s ", $dev->nameunit
 	else
 	    printf "(null)               "
@@ -1545,7 +1563,7 @@ define devinfo
     while ($dev != 0)
 	if ($dev->nameunit != 0 && $ignore == 0)
 	    spaces $indent
-	    printf "%s\n", $dev->nameunit
+	    printf "%s %p\n", $dev->nameunit, $dev
 	end
 	if ($dev->children.tqh_first != 0 && $ignore == 0)
 	    set $dev = $dev->children.tqh_first
@@ -1575,7 +1593,7 @@ define dumpmbuf
 	printf " ext %p", $arg0->M_dat.MH.MH_dat.MH_ext.ext_buf
     end
     if ($arg0->m_hdr.mh_flags & $M_PKTHDR)
-        set $h = $arg0->M_dat.MH.MH_pkthdr
+	set $h = $arg0->M_dat.MH.MH_pkthdr
 	printf " packet: %d bytes", $h.len
 	if ($h.rcvif != 0)
 	    printf " received via %s", $h.rcvif->if_xname
@@ -1589,7 +1607,7 @@ define mbuf
     set $m = (struct mbuf *)$arg0
     while ($m != 0)
 	dumpmbuf $m
-        set $m = $m->m_hdr.mh_next
+	set $m = $m->m_hdr.mh_next
     end
 end
 
@@ -1604,7 +1622,7 @@ define packets
 	printf "chain %p:\n", $mp
 	set $m = $mp
 	while ($m != 0)
-	        printf "  "
+		printf "  "
 	 	dumpmbuf $m
 		set $m = $m->m_hdr.mh_next
 	end
@@ -2300,10 +2318,10 @@ define kvm
     set $_entry = kernel_map->header.next
     set $_i = 0
     if (osrelease[0] < '8')
-        set $_swapkeg = swap_zone->uz_keg
+	set $_swapkeg = swap_zone->uz_keg
 	set $_callout = callout
     else
-        set $_swapkeg = swap_zone->uz_kegs.lh_first->kl_keg
+	set $_swapkeg = swap_zone->uz_kegs.lh_first->kl_keg
 	set $_callout = cc_cpu[0].cc_callout
     end
     set $_swapstart = $_swapkeg->uk_kva
@@ -2369,4 +2387,90 @@ end
 
 document kvm
 List the map top-level map entries in the kernel map.
+end
+
+define vmmap
+    set $_map = (struct vm_map *)$arg0
+    set $_entry = $_map->header.next
+    set $_loop = 1
+    while ($_loop)
+	if (($_entry->eflags & $MAP_ENTRY_IS_SUB_MAP) == 0)
+	    printf "0x%lx - 0x%lx ", $_entry->start, $_entry->end
+	    set $_obj = $_entry->object.vm_object
+	    printf "%p ", $_obj
+	    if ($_entry->protection & $VM_PROT_READ)
+		printf "r"
+	    else
+		printf "-"
+	    end
+	    if ($_entry->protection & $VM_PROT_WRITE)
+		printf "w"
+	    else
+		printf "-"
+	    end
+	    if ($_entry->protection & $VM_PROT_EXECUTE)
+		printf "x "
+	    else
+		printf "- "
+	    end
+	    if ($_obj != 0)
+		printf "%d %d 0x%x ", $_obj->ref_count, $_obj->shadow_count, \
+		    $_obj->flags
+	    else
+		printf "0 0 0x0 "
+	    end
+	    if ($_entry->eflags & $MAP_ENTRY_COW)
+		printf "COW "
+	    else
+		printf "NCOW "
+	    end
+	    if ($_entry->eflags & $MAP_ENTRY_NEEDS_COPY)
+		printf "NC "
+	    else
+		printf "NNC "
+	    end
+	    if ($_obj == 0)
+		printf "none -\n"
+	    else
+		if ($_obj->type == $OBJT_DEAD)
+		    printf "dead -\n"
+		else
+		    if ($_obj->type == $OBJT_DEFAULT)
+			printf "default -\n"
+		    else
+			if ($_obj->type == $OBJT_VNODE)
+			    printf "vnode %p\n", $_obj->handle
+			else
+			    if ($_obj->type == $OBJT_SWAP)
+				printf "swap -\n";
+			    else
+				if ($_obj->type == $OBJT_DEVICE)
+				    printf "device %p\n", $_obj->handle
+				else
+				    if ($_obj->type == $OBJT_PHYS)
+					printf "phys -\n"
+				    else
+					if ($_obj->type == $OBJT_SG)
+					    printf "sglist %p\n", $_obj->handle
+					else
+					    printf "%d %p\n", $_obj->type \
+						$_obj->handle
+					end
+				    end
+				end
+			    end
+			end
+		    end
+		end
+	    end
+	end
+	set $_entry = $_entry->next
+	if ($_entry == &$_map->header)
+	    set $_loop = 0
+	end
+    end
+end
+
+document vmmap
+Display the entries in a VM map.
 end
