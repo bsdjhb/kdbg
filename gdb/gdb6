@@ -1662,6 +1662,19 @@ document packets
 Display all the mbuf chains in a list of packets.
 end
 
+define eth
+    set $_eth = (struct ether_header *)$arg0
+    printf "src: "
+    print_ether_addr $_eth->ether_shost
+    printf "  dst: "
+    print_ether_addr $_eth->ether_dhost
+    printf "  type: %04x\n", $_eth->ether_type
+end
+
+document eth
+Display an Ethernet header
+end
+
 define semu_list
     set $sem = semu_list->slh_first
     while ($sem != 0)
@@ -2029,6 +2042,17 @@ set $IFT_ETHER = 0x6
 
 set $ETHER_ADDR_LEN = 6
 
+define print_ether_addr
+    set $_cp = (unsigned char *)$arg0
+    set $_i = 0
+    while ($_i < $ETHER_ADDR_LEN - 1)
+	printf "%02x:", *$_cp
+	set $_cp = $_cp + 1
+	set $_i = $_i + 1
+    end
+    printf "%02x", *$_cp
+end
+
 define print_sin
     set $_cp = (unsigned char *)&((struct sockaddr_in *)$arg0)->sin_addr
     printf "%d.%d.%d.%d", $_cp[0], $_cp[1], $_cp[2], $_cp[3]
@@ -2037,16 +2061,11 @@ end
 define print_ifa
     if ($arg0->ifa_addr->sa_family == $AF_LINK)
 	set $_sdl = (struct sockaddr_dl *)$arg0->ifa_addr
-	set $_cp = (unsigned char *)$_sdl->sdl_data + $_sdl->sdl_nlen
 	if ($_sdl->sdl_type == $IFT_ETHER && $_sdl->sdl_alen == $ETHER_ADDR_LEN)
 	    printf "    ether "
-	    set $_i = 0
-	    while ($_i < $ETHER_ADDR_LEN - 1)
-		printf "%02x:", *$_cp
-		set $_cp = $_cp + 1
-		set $_i = $_i + 1
-	    end
-	    printf "%02x\n", *$_cp
+	    set $_eaddr = (unsigned char *)$_sdl->sdl_data + $_sdl->sdl_nlen
+	    print_ether_addr $_eaddr
+	    printf "\n"
 	end
     else
 	if ($arg0->ifa_addr->sa_family == $AF_INET)
