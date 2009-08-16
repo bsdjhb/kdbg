@@ -1948,7 +1948,15 @@ define runq
 		else
 		    printf "      "
 		end
-		set $td = $kse->ke_thread
+		if (osrelease[0] >= '8')
+		    set $td = $kse
+		else
+		    if (osrelease[0] == '7')
+			set $td = $kse->ts_thread
+		    else
+			set $td = $kse->ke_thread
+		    end
+		end
 		printf "%3d %9d %5d ", (u_int)$td->td_priority, $td->td_tid, \
 		    $td->td_proc->p_pid
 		if ($td->td_proc->p_flag & $P_SYSTEM)
@@ -1959,14 +1967,22 @@ define runq
 		    printf "]"
 		end
 		printf "\n"
-		set $kse = $kse->ke_procq.tqe_next
+		if (osrelease[0] >= '8')
+		    set $kse = $td->td_runq.tqe_next
+		else
+		    if (osrelease[0] == '7')
+			set $kse = $kse->ts_procq.tqe_next
+		    else
+			set $kse = $kse->ke_procq.tqe_next
+		    end
+		end
 	    end
 	end
 	set $i = $i + 1
     end
 end
 
-define runqs
+define runqs_4bsd
     printf "queue pri    tid     pid   cmd\n"
     runq &runq -1
     if (mp_maxcpus >= 1)
@@ -1974,6 +1990,31 @@ define runqs
 	while ($j < mp_maxcpus)
 	    runq &runq_pcpu[$j] $j
 	    set $j = $j + 1
+	end
+    end
+end
+
+define runqs_ule
+    printf "queue pri    tid     pid   cmd\n"
+    set $j = 0
+    while ($j < mp_maxcpus)
+        set $tdq = tdq_cpu[$j]
+        runq $tdq->tdq_realtime $j
+        runq $tdq->tdq_timeshare $j
+        runq $tdq->tdq_idle $j
+	set $j = $j + 1
+    end
+end
+
+define runqs
+    set $name = (char *)sysctl___kern_sched_name->oid_arg1
+    if ($name[0] == 'U' && $name[1] == 'L' && $name[2] == 'E')
+	runqs_ule
+    else
+	if ($name[0] == '4' && $name[1] == 'B' && $name[2] == 'S')
+	    runqs_4bsd
+	else
+	    printf "Unknown scheduler: %s\n", $name
 	end
     end
 end
