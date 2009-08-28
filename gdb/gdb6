@@ -1591,7 +1591,7 @@ define devinfo
     while ($dev != 0)
 	if ($dev->nameunit != 0 && $ignore == 0)
 	    spaces $indent
-	    printf "%s %p\n", $dev->nameunit, $dev
+	    printf "%s %p (%p)\n", $dev->nameunit, $dev, $dev->softc
 	end
 	if ($dev->children.tqh_first != 0 && $ignore == 0)
 	    set $dev = $dev->children.tqh_first
