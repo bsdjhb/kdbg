@@ -17,7 +17,11 @@ set $PDRSHIFT = 0x15
 set $PAGE_SHIFT = 0xc
 
 define pmap_pde
-    set $arg2 = $arg0->pm_pdir[(vm_offset_t)$arg1 >> $PDRSHIFT]
+    set $_pm = (struct pmap *)$arg0
+    if ($_pm == 0)
+        set $_pm = &kernel_pmap_store
+    end
+    set $arg2 = $_pm->pm_pdir[(vm_offset_t)$arg1 >> $PDRSHIFT]
 end
 
 document pmap_pde
@@ -46,7 +50,7 @@ end
 define pmap_kextract
     set $va = (long)$arg0
     set $pa = -1
-    pmap_pde &kernel_pmap $arg0 $pde
+    pmap_pde 0 $arg0 $pde
     if ($pde & $PG_V)
 	if ($pde & $PG_PS)
 	    set $pa = ($pde & $PG_PS_FRAME) | ($va & $PDRMASK)
