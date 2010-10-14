@@ -2372,6 +2372,23 @@ document mounts
 Display mount points.
 end
 
+define rootvp
+    set $_m = (struct mount *)$arg0
+    set $_vp = $_m->mnt_nvnodelist.tqh_first
+    while ($_vp != 0)
+	if ($_vp->v_vflag & $VV_ROOT)
+	    printf "root: %p\n", $_vp
+	    set $_vp = 0
+	else
+	    set $_vp = $_vp->v_nmntvnodes.tqe_next
+	end
+    end
+end
+
+document rootvp
+Find root vnode for a given mount point.
+end
+
 define mntoptlist
     set $_opt = $arg0.tqh_first
     while ($_opt != 0)
@@ -2396,6 +2413,25 @@ end
 
 document mntopts
 Display the mount options for a specified mount.
+end
+
+define vls
+    set $_vp = (struct vnode *)$arg0
+    set $_ncp = $_vp->v_cache_src.lh_first
+    while ($_ncp != 0)
+	printf "%p: ", $_ncp->nc_vp
+	set $_i = 0
+	while ($_i < $_ncp.nc_nlen)
+	    printf "%c", $_ncp.nc_name[$_i]
+	    set $_i = $_i + 1
+	end
+	printf "\n"
+	set $_ncp = $_ncp->nc_src.le_next
+    end
+end
+
+document vls
+List child vnodes of a given vnode in the name cache.
 end
 
 define vpath
@@ -2429,6 +2465,26 @@ end
 
 document vpath
 Walk the namecache to lookup the pathname of a vnode.
+end
+
+define nfsfh
+    set $_vp = (struct vnode *)$arg0
+    set $_np = (struct nfsnode *)$_vp->v_data
+    set $_i = 0
+    while ($_i < $_np->n_fhsize)
+	printf "%02x", ((u_char *)$_np->n_fhp)[$_i]
+	set $_i = $_i + 1
+	if ($_i % 32 == 0)
+	    printf "\n"
+	end
+    end
+    if ($_i % 32 != 0)
+	printf "\n"
+    end
+end
+
+document nfsfh
+Display the filehandle for a NFS vnode in hex.
 end
 
 define kqueue
