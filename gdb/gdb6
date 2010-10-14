@@ -49,10 +49,8 @@ if (osrelease[0] >= '8')
     set $LK_FLAGMASK = 0x07
     set $LK_SHARERS_SHIFT = 3
     set $LK_UNLOCKED = ((0) << $LK_SHARERS_SHIFT | $LK_SHARE)
-    set $LK_KERNPROC = ((uintptr_t)(-1) & ~$LK_FLAGMASK)
 else
     set $LK_WAITDRAIN = 0x00080000
-    set $LK_KERNPROC = (void *)-2
 end
 
 set $MAP_ENTRY_IS_SUB_MAP = 0x0002
@@ -761,13 +759,9 @@ end
 define lockmgr_owner_old7
     if (((struct lock *)$arg0)->lk_exclusivecount != 0)
 	set $td = ((struct lock *)$arg0)->lk_lockholder
-	if ($td == $LK_KERNPROC)
-	    printf "LK_KERNPROC\n"
-	else
-	    printf "td: %p\n", $td
-	    printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
-		$td->td_proc->p_comm
-	end
+	printf "td: %p\n", $td
+	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
     end
     if (((struct lock *)$arg0)->lk_sharecount != 0)
 	printf "share count: %d\n", ((struct lock *)$arg0)->lk_sharecount
@@ -781,15 +775,11 @@ define lockmgr_owner_new8
 		~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	end
     else
-	if (((struct lock *)$arg0)->lk_lock == $LK_KERNPROC)
-	    printf "LK_KERNPROC\n"
-	else
-	    set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
-		~$LK_FLAGMASK)
-	    printf "td: %p\n", $td
-	    printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
-		$td->td_proc->p_comm
-	end
+	set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
+	    ~$LK_FLAGMASK)
+	printf "td: %p\n", $td
+	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+	    $td->td_proc->p_comm
     end
 end
 
@@ -861,14 +851,9 @@ define lockmgr_printinfo_old7
 	printf "lock type %s: SHARED (count %d)", $_name, $arg0->lk_sharecount
     else
 	if ($arg0->lk_exclusivecount)
-	    printf "lock type %s: EXCL (count %d) by ", $_name, \
-		$arg0->lk_exclusivecount
-	    if ($arg0->lk_lockholder == $LK_KERNPROC)
-		printf "LK_KERNPROC"
-	    else
-		printf "thread %p (pid %d)", $arg0->lk_lockholder, \
-		    $arg0->lk_lockholder->td_proc->p_pid
-	    end
+	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
+		$_name, $arg0->lk_exclusivecount, $arg0->lk_lockholder, \
+		$arg0->lk_lockholder->td_proc->p_pid
 	else
 	    printf "lock type %s: UNLOCKED", $_name
 	end
@@ -887,13 +872,9 @@ define lockmgr_printinfo_new8
 		$arg0->lock_object.lo_name, \
 		($arg0->lk_lock & ~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	else
-	    printf "lock type %s: EXCL by ", $arg0->lock_object.lo_name
-	    if ($arg0->lk_lock == $LK_KERNPROC)
-		printf "LK_KERNPROC"
-	    else
-		set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
-		printf "thread %p (pid %d)", $_td, $_td->td_proc->p_pid
-	    end
+	    set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
+	    printf "lock type %s: EXCL by thread %p (pid %d)", \
+		$arg0->lock_object.lo_name, $_td, $_td->td_proc->p_pid
 	end
     end
     if ($arg0->lk_lock & $LK_EXCLUSIVE_WAITERS)
@@ -1008,12 +989,7 @@ define lk_chain_old6
 	    set $arg2 = 0
 	else
 	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
-	    if ($lkp->lk_lockholder == $LK_KERNPROC)
-		printf "\n LK_KERNPROC"
-		set $arg2 = 0
-	    else
-		set $arg2 = $lkp->lk_lockholder
-	    end
+	    set $arg2 = $lkp->lk_lockholder
 	end
     else
 	set $arg1 = 0
@@ -1033,12 +1009,7 @@ define lk_chain_old7
 	    set $arg2 = 0
 	else
 	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
-	    if ($lkp->lk_lockholder == $LK_KERNPROC)
-		printf "\n LK_KERNPROC"
-		set $arg2 = 0
-	    else
-		set $arg2 = $lkp->lk_lockholder
-	    end
+	    set $arg2 = $lkp->lk_lockholder
 	end
     end
 end
@@ -1057,12 +1028,7 @@ define lk_chain_new8
 	    set $arg2 = 0
 	else
 	    printf "EXCL"
-	    if ($lk->lk_lock == $LK_KERNPROC)
-		printf "\n LK_KERNPROC"
-		set $arg2 = 0
-	    else
-		set $arg2 = (struct thread *)($lk->lk_lock & ~$LK_FLAGMASK)
-	    end
+	    set $arg2 = (struct thread *)($lk->lk_lock & ~$LK_FLAGMASK)
 	end
     end
 end
@@ -2128,35 +2094,9 @@ define print_ether_addr
     printf "%02x", *$_cp
 end
 
-define print_ip
-    set $_cp = (unsigned char *)$arg0
-    printf "%d.%d.%d.%d", $_cp[0], $_cp[1], $_cp[2], $_cp[3]
-end
-
 define print_sin
-    set $_ip = &((struct sockaddr_in *)$arg0)->sin_addr
-    print_ip $_ip
-end
-
-define print_sa
-    set $_sa = (struct sockaddr *)$arg0
-    if ($_sa->sa_family == $AF_LINK)
-	set $_sdl = (struct sockaddr_dl *)$_sa
-	if ($_sdl->sdl_type == $IFT_ETHER && $_sdl->sdl_alen == $ETHER_ADDR_LEN)
-	    printf "    ether "
-	    set $_eaddr = (unsigned char *)$_sdl->sdl_data + $_sdl->sdl_nlen
-	    print_ether_addr $_eaddr
-	else
-	    printf "    link (%d)", $_sdl->sdl_type
-	end
-    else
-	if ($_sa->sa_family == $AF_INET)
-	    printf "    inet  "
-	    print_sin $_sa
-	else
-	    printf "    family (%d)", $_sa->sa_family
-	end
-    end
+    set $_cp = (unsigned char *)&((struct sockaddr_in *)$arg0)->sin_addr
+    printf "%d.%d.%d.%d", $_cp[0], $_cp[1], $_cp[2], $_cp[3]
 end
 
 define print_ifa
@@ -2240,23 +2180,6 @@ define print_ifnet
 	end
     end
     printf "\n"
-    if ($arg0->if_dname[0] == 'v' && $arg0->if_dname[1] == 'l' && \
-	$arg0->if_dname[2] == 'a' && $arg0->if_dname[3] == 'n')
-	set $_ifv = (struct ifvlan *)$arg0->if_softc
-	printf "    vlan: "
-	if ($_ifv->ifv_trunk != 0)
-	    printf "%d", $_ifv->ifv_mib.ifvm_tag
-	else
-	    printf "0"
-	end
-	printf " parent interface: "
-	if ($_ifv->ifv_trunk != 0)
-	    printf "%s", $_ifv->ifv_trunk->parent->if_xname
-	else
-	    printf "<none>"
-	end
-	printf "\n"
-    end
 end
 
 define ifconfig
@@ -2269,21 +2192,6 @@ end
 
 document ifconfig
 Stripped down output similar to 'ifconfig -a'.
-end
-
-define maddr
-    set $_ifp = (struct ifnet *)$arg0
-    printf "%s: multicast addresses:\n", $_ifp->if_xname
-    set $_ifma = $_ifp->if_multiaddrs.tqh_first
-    while ($_ifma != 0)
-        print_sa $_ifma->ifma_addr
-	printf " (%d)\n", $_ifma->ifma_refcount
-	set $_ifma = $_ifma->ifma_link.tqe_next
-    end
-end
-
-document maddr
-Display multicast addresses for a specified interface.
 end
 
 define cdevs
@@ -2372,23 +2280,6 @@ document mounts
 Display mount points.
 end
 
-define rootvp
-    set $_m = (struct mount *)$arg0
-    set $_vp = $_m->mnt_nvnodelist.tqh_first
-    while ($_vp != 0)
-	if ($_vp->v_vflag & $VV_ROOT)
-	    printf "root: %p\n", $_vp
-	    set $_vp = 0
-	else
-	    set $_vp = $_vp->v_nmntvnodes.tqe_next
-	end
-    end
-end
-
-document rootvp
-Find root vnode for a given mount point.
-end
-
 define mntoptlist
     set $_opt = $arg0.tqh_first
     while ($_opt != 0)
@@ -2413,25 +2304,6 @@ end
 
 document mntopts
 Display the mount options for a specified mount.
-end
-
-define vls
-    set $_vp = (struct vnode *)$arg0
-    set $_ncp = $_vp->v_cache_src.lh_first
-    while ($_ncp != 0)
-	printf "%p: ", $_ncp->nc_vp
-	set $_i = 0
-	while ($_i < $_ncp.nc_nlen)
-	    printf "%c", $_ncp.nc_name[$_i]
-	    set $_i = $_i + 1
-	end
-	printf "\n"
-	set $_ncp = $_ncp->nc_src.le_next
-    end
-end
-
-document vls
-List child vnodes of a given vnode in the name cache.
 end
 
 define vpath
@@ -2465,26 +2337,6 @@ end
 
 document vpath
 Walk the namecache to lookup the pathname of a vnode.
-end
-
-define nfsfh
-    set $_vp = (struct vnode *)$arg0
-    set $_np = (struct nfsnode *)$_vp->v_data
-    set $_i = 0
-    while ($_i < $_np->n_fhsize)
-	printf "%02x", ((u_char *)$_np->n_fhp)[$_i]
-	set $_i = $_i + 1
-	if ($_i % 32 == 0)
-	    printf "\n"
-	end
-    end
-    if ($_i % 32 != 0)
-	printf "\n"
-    end
-end
-
-document nfsfh
-Display the filehandle for a NFS vnode in hex.
 end
 
 define kqueue
@@ -2709,248 +2561,4 @@ end
 
 document vmmap
 Display the entries in a VM map.
-end
-
-# For each cxgb device, execute $arg0 passing the port_info structure as the
-# argument
-define fe_cxgb
-    set $dev = root_bus
-    set $ignore = 0
-    while ($dev != 0)
-	if ($dev->nameunit != 0 && $ignore == 0)
-	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
-	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
-		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
-		set $pi = (struct port_info *)$dev->softc
-		$arg0 $pi
-	    end
-	end
-	if ($dev->children.tqh_first != 0 && $ignore == 0)
-	    set $dev = $dev->children.tqh_first
-	    set $ignore = 0
-	else
-	    if ($dev->link.tqe_next != 0)
-		set $dev = $dev->link.tqe_next
-		set $ignore = 0
-	    else
-		set $dev = $dev->parent
-		set $ignore = 1
-	    end
-	end
-    end
-end
-
-# For each cxgbc device, execute $arg0 passing the adapter structure as the
-# argument
-define fe_cxgbc
-    set $dev = root_bus
-    set $ignore = 0
-    while ($dev != 0)
-	if ($dev->nameunit != 0 && $ignore == 0)
-	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
-	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
-		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
-		if ($dev->parent->children.tqh_first == $dev)
-		    set $pi = (struct port_info *)$dev->softc
-		    $arg0 $pi->adapter
-		end
-	    end
-	end
-	if ($dev->children.tqh_first != 0 && $ignore == 0)
-	    set $dev = $dev->children.tqh_first
-	    set $ignore = 0
-	else
-	    if ($dev->link.tqe_next != 0)
-		set $dev = $dev->link.tqe_next
-		set $ignore = 0
-	    else
-		set $dev = $dev->parent
-		set $ignore = 1
-	    end
-	end
-    end
-end
-
-define tcam_helper
-    printf "%s: %d entries", $arg0->dev->nameunit, $arg0->mc5.tcam_size
-    if ($arg0->params.offload)
-        printf " (offload)"
-    end
-    printf "\n"
-end
-    
-define tcam
-    fe_cxgbc tcam_helper
-end
-
-document tcam
-Display number of TCAM entries for any Chelsio adapters.
-end
-
-define filters_helper
-    if ($arg0->filters != 0)
-	printf "%s: %d filters:\n", $arg0->dev->nameunit, \
-	    $arg0->params.mc5.nfilters
-	set $i = 0
-	while ($i < $arg0->params.mc5.nfilters)
-	    set $f = $arg0->filters + $i
-	    if ($f->valid)
-		printf "%6d: ", $i
-		print_ip &$f->sip
-		printf ":"
-		printf "%d ", $f->sport
-		print_ip &$f->dip
-		printf ":"
-		printf "%d ", $f->dport
-		if ($f->vlan != 0xfff)
-		    printf "vlan %d ", $f->vlan
-		end
-		if ($f->pkt_type == 0)
-		    printf "ANY  "
-		else
-		    if ($f->pkt_type == 1)
-			printf "TCP  "
-		    else
-			if ($f->pkt_type == 2)
-			    printf "UDP  "
-			else
-			    printf "FRAG "
-			end
-		    end
-		end
-		if ($f->pass)
-		    printf "PASS "
-		else
-		    printf "DROP "
-		end
-		if ($f->rss == 0)
-		    printf "Q:%d", $f->qset
-		else
-		    printf "RSS"
-		end
-		if ($f->locked)
-		    printf " LK"
-		end
-		printf "\n"
-	    end
-	    set $i = $i + 1
-	end
-    end
-end
-
-define filters
-    fe_cxgbc filters_helper
-end
-
-document filters
-Display filter rules for any Chelsio adapters.
-end
-
-define ctrlq_helper
-    set $txq = $arg0->sge.qs[0].txq[2]
-    printf "%s: size %d in_use %d processed %d cleaned %d\n", \
-	$arg0->dev->nameunit, $txq->size, $txq->in_use, $txq->processed, \
-	$txq->cleaned
-end
-
-define ctrlq
-    fe_cxgbc ctrlq_helper
-end
-
-document ctrlq
-Display ctrlq stats for any Chelsio adapters.
-end
-
-set $F_RSPD_GEN2 = 1
-
-define userq
-    set $qs = (struct sge_qset *)$arg0
-    set $uq = $qs->userq.state
-    printf "queueset %d:\n", $qs - $qs->port->adapter.sge.qs
-    set $pending = 0
-    set $idx = $uq->rspq.cidx
-    set $r = $qs->rspq.desc[$idx]
-    set $gen = $uq->rspq.gen
-    while ($idx >= 0 && ($r->intr_gen & $F_RSPD_GEN2) == $gen)
-	set $pending = $pending + 1
-	set $idx = $idx + 1
-	if ($idx == $uq->rspq.size)
-	    set $idx = 0
-	    set $gen = $gen ^ 1
-	end
-	if ($idx == $uq->rspq.cidx)
-	    set $idx = -1
-	end
-	set $r = $qs->rspq.desc[$idx]
-    end
-    printf " rspq size: %d  cidx: %d  credits: %d pending: %d\n", \
-	$uq->rspq.size, $uq->rspq.cidx, $uq->rspq.credits, $pending
-    printf "  fl0 size: %d   idx: %d\n", $uq->fl.size, $uq->fl.idx
-end
-
-document userq
-Display stats about a user queue.
-end
-
-define userqs_helper
-    printf "%s: user queues:\n", $arg0->ifp->if_xname
-    set $i = 0
-    while ($i < $arg0->nqsets)
-	set $qs = $arg0->adapter->sge.qs + $arg0->first_qset + $i
-	if ($qs->userq.state != 0)
-	    printf "  %d: %p\n", $qs - $arg0->adapter->sge.qs, $qs
-	end
-	set $i = $i + 1
-    end
-end
-
-define userqs
-    fe_cxgb userqs_helper
-end
-
-document userqs
-List user queue sets.
-end
-
-define sum_sock
-    if ($arg0 != 0)
-	set $arg1 = $arg1 + $arg0->so_rcv.sb_ccnt
-	set $arg1 = $arg1 + $arg0->so_snd.sb_ccnt
-    end
-end
-
-define sum_inp
-    set $inp = $arg0.ipi_listhead.lh_first
-    while ($inp != 0)
-	sum_sock $inp->inp_socket $arg1
-	set $inp = $inp->inp_list.le_next
-    end
-end
-
-define sum_unp
-    set $unp = $arg0.lh_first
-    while ($unp != 0)
-	sum_sock $unp->unp_socket $arg1
-	set $unp = $unp->unp_link.le_next
-    end
-end
-
-define mbufs
-    set $udpcnt = 0
-    sum_inp udbinfo $udpcnt
-    printf "UDP:         %d\n", $udpcnt
-    set $tcpcnt = 0
-    sum_inp tcbinfo $tcpcnt
-    printf "TCP:         %d\n", $tcpcnt
-    set $undg = 0
-    sum_unp unp_dhead $undg
-    printf "UNIX DG:     %d\n", $undg
-    set $unst = 0
-    sum_unp unp_shead $unst
-    printf "UNIX Stream: %d\n", $unst
-    printf "Total:       %d\n", $udpcnt + $tcpcnt + $undg + $unst
-end
-
-document mbufs
-Count mbuf clusters in use in sockets.
 end
