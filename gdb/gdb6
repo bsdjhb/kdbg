@@ -49,8 +49,10 @@ if (osrelease[0] >= '8')
     set $LK_FLAGMASK = 0x07
     set $LK_SHARERS_SHIFT = 3
     set $LK_UNLOCKED = ((0) << $LK_SHARERS_SHIFT | $LK_SHARE)
+    set $LK_KERNPROC = ((uintptr_t)(-1) & ~$LK_FLAGMASK)
 else
     set $LK_WAITDRAIN = 0x00080000
+    set $LK_KERNPROC = (void *)-2
 end
 
 set $MAP_ENTRY_IS_SUB_MAP = 0x0002
@@ -759,9 +761,13 @@ end
 define lockmgr_owner_old7
     if (((struct lock *)$arg0)->lk_exclusivecount != 0)
 	set $td = ((struct lock *)$arg0)->lk_lockholder
-	printf "td: %p\n", $td
-	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
-	    $td->td_proc->p_comm
+	if ($td == $LK_KERNPROC)
+	    printf "LK_KERNPROC\n"
+	else
+	    printf "td: %p\n", $td
+	    printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+		$td->td_proc->p_comm
+	end
     end
     if (((struct lock *)$arg0)->lk_sharecount != 0)
 	printf "share count: %d\n", ((struct lock *)$arg0)->lk_sharecount
@@ -775,11 +781,15 @@ define lockmgr_owner_new8
 		~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	end
     else
-	set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
-	    ~$LK_FLAGMASK)
-	printf "td: %p\n", $td
-	printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
-	    $td->td_proc->p_comm
+	if (((struct lock *)$arg0)->lk_lock == $LK_KERNPROC)
+	    printf "LK_KERNPROC\n"
+	else
+	    set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
+		~$LK_FLAGMASK)
+	    printf "td: %p\n", $td
+	    printf "pid: %d, p_comm: %s\n", $td->td_proc->p_pid, \
+		$td->td_proc->p_comm
+	end
     end
 end
 
@@ -851,9 +861,14 @@ define lockmgr_printinfo_old7
 	printf "lock type %s: SHARED (count %d)", $_name, $arg0->lk_sharecount
     else
 	if ($arg0->lk_exclusivecount)
-	    printf "lock type %s: EXCL (count %d) by thread %p (pid %d)", \
-		$_name, $arg0->lk_exclusivecount, $arg0->lk_lockholder, \
-		$arg0->lk_lockholder->td_proc->p_pid
+	    printf "lock type %s: EXCL (count %d) by ", $_name, \
+		$arg0->lk_exclusivecount
+	    if ($arg0->lk_lockholder == $LK_KERNPROC)
+		printf "LK_KERNPROC"
+	    else
+		printf "thread %p (pid %d)", $arg0->lk_lockholder, \
+		    $arg0->lk_lockholder->td_proc->p_pid
+	    end
 	else
 	    printf "lock type %s: UNLOCKED", $_name
 	end
@@ -872,9 +887,13 @@ define lockmgr_printinfo_new8
 		$arg0->lock_object.lo_name, \
 		($arg0->lk_lock & ~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	else
-	    set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
-	    printf "lock type %s: EXCL by thread %p (pid %d)", \
-		$arg0->lock_object.lo_name, $_td, $_td->td_proc->p_pid
+	    printf "lock type %s: EXCL by ", $arg0->lock_object.lo_name
+	    if ($arg0->lk_lock == $LK_KERNPROC)
+		printf "LK_KERNPROC"
+	    else
+		set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
+		printf "thread %p (pid %d)", $_td, $_td->td_proc->p_pid
+	    end
 	end
     end
     if ($arg0->lk_lock & $LK_EXCLUSIVE_WAITERS)
@@ -989,7 +1008,12 @@ define lk_chain_old6
 	    set $arg2 = 0
 	else
 	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
-	    set $arg2 = $lkp->lk_lockholder
+	    if ($lkp->lk_lockholder == $LK_KERNPROC)
+		printf "\n LK_KERNPROC"
+		set $arg2 = 0
+	    else
+		set $arg2 = $lkp->lk_lockholder
+	    end
 	end
     else
 	set $arg1 = 0
@@ -1009,7 +1033,12 @@ define lk_chain_old7
 	    set $arg2 = 0
 	else
 	    printf "EXCL (count %d)", $lkp->lk_exclusivecount
-	    set $arg2 = $lkp->lk_lockholder
+	    if ($lkp->lk_lockholder == $LK_KERNPROC)
+		printf "\n LK_KERNPROC"
+		set $arg2 = 0
+	    else
+		set $arg2 = $lkp->lk_lockholder
+	    end
 	end
     end
 end
@@ -1028,7 +1057,12 @@ define lk_chain_new8
 	    set $arg2 = 0
 	else
 	    printf "EXCL"
-	    set $arg2 = (struct thread *)($lk->lk_lock & ~$LK_FLAGMASK)
+	    if ($lk->lk_lock == $LK_KERNPROC)
+		printf "\n LK_KERNPROC"
+		set $arg2 = 0
+	    else
+		set $arg2 = (struct thread *)($lk->lk_lock & ~$LK_FLAGMASK)
+	    end
 	end
     end
 end
