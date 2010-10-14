@@ -2128,9 +2128,35 @@ define print_ether_addr
     printf "%02x", *$_cp
 end
 
-define print_sin
-    set $_cp = (unsigned char *)&((struct sockaddr_in *)$arg0)->sin_addr
+define print_ip
+    set $_cp = (unsigned char *)$arg0
     printf "%d.%d.%d.%d", $_cp[0], $_cp[1], $_cp[2], $_cp[3]
+end
+
+define print_sin
+    set $_ip = &((struct sockaddr_in *)$arg0)->sin_addr
+    print_ip $_ip
+end
+
+define print_sa
+    set $_sa = (struct sockaddr *)$arg0
+    if ($_sa->sa_family == $AF_LINK)
+	set $_sdl = (struct sockaddr_dl *)$_sa
+	if ($_sdl->sdl_type == $IFT_ETHER && $_sdl->sdl_alen == $ETHER_ADDR_LEN)
+	    printf "    ether "
+	    set $_eaddr = (unsigned char *)$_sdl->sdl_data + $_sdl->sdl_nlen
+	    print_ether_addr $_eaddr
+	else
+	    printf "    link (%d)", $_sdl->sdl_type
+	end
+    else
+	if ($_sa->sa_family == $AF_INET)
+	    printf "    inet  "
+	    print_sin $_sa
+	else
+	    printf "    family (%d)", $_sa->sa_family
+	end
+    end
 end
 
 define print_ifa
@@ -2214,6 +2240,23 @@ define print_ifnet
 	end
     end
     printf "\n"
+    if ($arg0->if_dname[0] == 'v' && $arg0->if_dname[1] == 'l' && \
+	$arg0->if_dname[2] == 'a' && $arg0->if_dname[3] == 'n')
+	set $_ifv = (struct ifvlan *)$arg0->if_softc
+	printf "    vlan: "
+	if ($_ifv->ifv_trunk != 0)
+	    printf "%d", $_ifv->ifv_mib.ifvm_tag
+	else
+	    printf "0"
+	end
+	printf " parent interface: "
+	if ($_ifv->ifv_trunk != 0)
+	    printf "%s", $_ifv->ifv_trunk->parent->if_xname
+	else
+	    printf "<none>"
+	end
+	printf "\n"
+    end
 end
 
 define ifconfig
@@ -2226,6 +2269,21 @@ end
 
 document ifconfig
 Stripped down output similar to 'ifconfig -a'.
+end
+
+define maddr
+    set $_ifp = (struct ifnet *)$arg0
+    printf "%s: multicast addresses:\n", $_ifp->if_xname
+    set $_ifma = $_ifp->if_multiaddrs.tqh_first
+    while ($_ifma != 0)
+        print_sa $_ifma->ifma_addr
+	printf " (%d)\n", $_ifma->ifma_refcount
+	set $_ifma = $_ifma->ifma_link.tqe_next
+    end
+end
+
+document maddr
+Display multicast addresses for a specified interface.
 end
 
 define cdevs
