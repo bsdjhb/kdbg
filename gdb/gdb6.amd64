@@ -27,6 +27,9 @@ set $NPDPEPGSHIFT = 0x9
 set $NPDEPGSHIFT = 0x9
 set $NPTEPGSHIFT = 0x9
 
+set $MC_STATUS_ADDRV = 0x0400000000000000
+set $MC_STATUS_MISCV = 0x0800000000000000
+
 define pmap_pml4e
     set $_pm = (struct pmap *)$arg0
     set $_va = (long)$arg1
@@ -260,6 +263,48 @@ end
 
 document irqs
 Dump list of IRQs with associated CPU.
+end
+
+define mca_log_old
+    printf "MCA: bank %d, status 0x%016llx\n", $arg0.mr_bank, $arg0.mr_status
+    printf "MCA: CPU %d xxxx\n", $arg0.mr_apic_id
+    if ($arg0.mr_status & $MC_STATUS_ADDRV)
+	printf "MCA: Address 0x%llx\n", $arg0.mr_addr
+    end
+    if ($arg0.mr_status & $MC_STATUS_MISCV)
+	printf "MCA: Misc 0x%llx\n", $arg0.mr_misc
+    end
+end
+
+define mca_log
+    printf "MCA: Bank %d, Status 0x%016llx\n", $arg0.mr_bank, $arg0.mr_status
+    printf "MCA: Global Cap 0x%016llx, Status 0x%016llx\n", $arg0.mr_mcg_cap, \
+	$arg0.mr_mcg_status
+    printf "MCA: Vendor \"%s\", ID 0x%x, APIC ID %d\n", cpu_vendor, \
+	$arg0.mr_cpu_id, $arg0.mr_apic_id
+    printf "MCA: CPU %d xxxx\n", $arg0.mr_cpu
+    if ($arg0.mr_status & $MC_STATUS_ADDRV)
+	printf "MCA: Address 0x%llx\n", $arg0.mr_addr
+    end
+    if ($arg0.mr_status & $MC_STATUS_MISCV)
+	printf "MCA: Misc 0x%llx\n", $arg0.mr_misc
+    end
+end
+
+define mca
+   set $mr = mca_records.stqh_first
+   while ($mr != 0)
+	if (sizeof($mr->rec) == 40)
+	    mca_log_old $mr->rec
+	else
+	    mca_log $mr->rec
+	end
+	set $mr = $mr->link.stqe_next
+   end
+end
+
+document mca
+Display machine check records in dmesg format for mcelog parsing.
 end
 
 directory /sys/amd64/include
