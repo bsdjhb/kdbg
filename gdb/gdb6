@@ -95,11 +95,17 @@ set $M_PKTHDR = 0x0002
 # Number of chars output by %p
 set $PTRWIDTH = (sizeof(void *) * 2 + 2)
 
-if (machine_arch[0] == 'a' && machine_arch[1] == 'm' && machine_arch[2] == 'd')
+if (osreldate < 801501)
+    set $arch = machine_arch
+else
+    set $arch = sysctl_hw_machine_arch::machine_arch
+end
+
+if ($arch[0] == 'a' && $arch[1] == 'm' && $arch[2] == 'd')
     source gdb6.amd64
     set $__amd64__ = 1
 end
-if (machine_arch[0] == 'i' && machine_arch[1] == '3' && machine_arch[2] == '8')
+if ($arch[0] == 'i' && $arch[1] == '3' && $arch[2] == '8')
     source gdb6.i386
     set $__i386__ = 1
 end
@@ -194,7 +200,7 @@ end
 define dumpthread
     if ($arg1)
 	set $x = 0
-	printf " %9d              ", $arg0->td_tid
+	printf " %9d   %3d        ", $arg0->td_tid, $arg0->td_priority
 	if ($arg0->td_state == TDS_RUNNING)
 	    printf " Run    "
 	    set $x = 1
@@ -2133,6 +2139,12 @@ define print_ip
     printf "%d.%d.%d.%d", $_cp[0], $_cp[1], $_cp[2], $_cp[3]
 end
 
+define print_port
+    set $_port = (uint16_t)$arg0
+    set $_port = ($_port & 0xff00) >> 8 | ($_port & 0xff) << 8
+    printf "%d", $_port
+end
+
 define print_sin
     set $_ip = &((struct sockaddr_in *)$arg0)->sin_addr
     print_ip $_ip
@@ -2286,6 +2298,69 @@ document maddr
 Display multicast addresses for a specified interface.
 end
 
+define imo
+    set $_i = 0
+    while ($_i < $arg0->imo_num_memberships)
+        set $_in = $arg0->imo_membership[$_i]
+        printf " group "
+        print_ip &$_in->inm_addr.s_addr
+	printf " on %s\n", $_in->inm_ifp->if_xname
+        set $_i = $_i + 1
+    end
+end
+
+document imo
+Display multicast addresses for an inpcb multicast options list.
+end
+
+define inaddr
+    set $_ie = &((struct inpcb *)$arg0)->inp_inc.inc_ie
+    set $_ip = &$_ie->ie_dependladdr.ie46_local.ia46_addr4
+    print_ip $_ip
+    printf ":"
+    print_port $_ie.ie_lport 
+    printf " -> "
+    set $_ip = &$_ie->ie_dependfaddr.ie46_foreign.ia46_addr4
+    print_ip $_ip
+    printf ":"
+    print_port $_ie.ie_fport
+    printf "\n"
+    set $_imo = $arg0->inp_depend4.inp4_moptions
+    if ($_imo != 0)
+	imo $_imo
+    end
+end
+
+document inaddr
+Print out addresses for an inpcb.
+end
+
+define tcps
+    set $_inp = tcbinfo.ipi_listhead.lh_first
+    while ($_inp != 0)
+	printf "%p: ", $_inp
+	inaddr $_inp
+	set $_inp = $_inp.inp_list.le_next
+    end
+end
+
+document tcps
+Print out all TCP control blocks.
+end
+
+define udps
+    set $_inp = udbinfo.ipi_listhead.lh_first
+    while ($_inp != 0)
+	printf "%p: ", $_inp
+	inaddr $_inp
+	set $_inp = $_inp.inp_list.le_next
+    end
+end
+
+document udps
+Print out all UDP control blocks.
+end
+
 define cdevs
     set $cdev = cdevp_list->tqh_first
     while ($cdev != 0)
@@ -2425,6 +2500,9 @@ define vls
 	    printf "%c", $_ncp.nc_name[$_i]
 	    set $_i = $_i + 1
 	end
+	if ($_ncp->nc_vp != 0 && $_ncp->nc_vp->v_type == VDIR)
+	    printf "/"
+	end
 	printf "\n"
 	set $_ncp = $_ncp->nc_src.le_next
     end
@@ -2485,6 +2563,38 @@ end
 
 document nfsfh
 Display the filehandle for a NFS vnode in hex.
+end
+
+set $DIRHASH_EMPTY = -1
+set $DIRHASH_DEL = -2
+set $DH_BLKOFFSHIFT = 8
+set $DH_NBLKOFF = (1 << $DH_BLKOFFSHIFT)
+
+define dirhash
+    set $_vp = (struct vnode *)$arg0
+    set $_ip = (struct inode *)$_vp->v_data
+    set $_dh = $_ip->i_un.dirhash
+    set $i = 0
+    printf "%d entries for %p:\n", $_dh->dh_hlen, $_dh
+    while ($i < $_dh->dh_narrays)
+	set $j = 0
+	while ($j < $DH_NBLKOFF)
+	    if ($_dh->dh_hash[$i][$j] != $DIRHASH_EMPTY)
+		if ($_dh->dh_hash[$i][$j] == $DIRHASH_DEL)
+		    printf "%4d: DELETED\n", ($i << $DH_BLKOFFSHIFT) + $j
+		else
+		    printf "%4d: %08x\n", ($i << $DH_BLKOFFSHIFT) + $j, \
+			$_dh->dh_hash[$i][$j]
+		end
+	    end
+	    set $j = $j + 1
+	end
+	set $i = $i + 1
+    end
+end
+
+document dirhash
+Display directory hash for a UFS directory vnode.
 end
 
 define kqueue
@@ -2709,4 +2819,87 @@ end
 
 document vmmap
 Display the entries in a VM map.
+end
+
+define ule_load_7
+    set $i = 0
+    while ($i <= tdg_maxid)
+	printf "tdg %d: %d\n", $i, tdq_groups[$i].tdg_load
+	set $i = $i + 1
+    end
+end
+
+define ule_load_8
+    set $i = 0
+    while ($i <= mp_maxid)
+	if ((1 << $i) & all_cpus)
+	    printf "tdq %d: %d\n", $i, tdq_cpu[$i].tdq_sysload
+	end
+	set $i = $i + 1
+    end
+end
+
+define ule_load
+    if (osrelease[0] >= '8')
+	ule_load_8
+    else
+	ule_load_7
+    end
+end
+
+document ule_load
+Display scheduler load.
+end
+
+set $SLP_VALID = 0x01
+set $SLP_DOREC = 0x02
+set $SLP_NEEDQ = 0x04
+set $SLP_DISCONN = 0x08
+set $SLP_GETSTREAM = 0x10
+set $SLP_LASTFRAG = 0x20
+
+define nfsd_sockets
+    set $valid = 0
+    set $dorec = 0
+    set $needq = 0
+    set $disconn = 0
+    set $getstream = 0
+    set $lastfrag = 0
+    set $count = 0
+    set $slp = nfssvc_sockhead.tqh_first
+    while ($slp != 0)
+	if ($slp->ns_flag & $SLP_VALID)
+	    set $valid = $valid + 1
+	end
+	if ($slp->ns_flag & $SLP_DOREC)
+	    set $dorec = $dorec + 1
+	end
+	if ($slp->ns_flag & $SLP_NEEDQ)
+	    set $needq = $needq + 1
+	end
+	if ($slp->ns_flag & $SLP_DISCONN)
+	    set $disconn = $disconn + 1
+	end
+	if ($slp->ns_flag & $SLP_GETSTREAM)
+	    set $getstream = $getstream + 1
+	end
+	if ($slp->ns_flag & $SLP_LASTFRAG)
+	    set $lastfrag = $lastfrag + 1
+	end
+	set $count = $count + 1
+	set $slp = $slp->ns_chain.tqe_next
+    end
+    printf "total: %d  valid: %d  dorec: %d  needq: %d\n", $count, $valid, \
+	$dorec, $needq
+    printf "disconn: %d  getstream: %d  lastfrag: %d\n", $disconn, $getstream, \
+	$lastfrag
+end
+
+define futex_waiters
+    set $f = (struct futex *)$arg0
+    set $wp = $f->f_waiting_proc.tqh_first
+    while ($wp != 0)
+	printf "wp: %p\n", $wp
+	set $wp = $wp->wp_list.tqe_next
+    end
 end
