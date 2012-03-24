@@ -1,6 +1,9 @@
 # $Id$
 # General kernel macros
 
+# Determine OS major version
+set $osrelease = osreldate / 100000
+
 # Macros
 set $TDI_SUSPENDED = 0x1
 set $TDI_SLEEPING = 0x2
@@ -25,24 +28,24 @@ set $P_STOPPED_TRACE = 0x40000
 set $P_STOPPED_SINGLE = 0x80000
 set $P_STOPPED = ($P_STOPPED_SIG | $P_STOPPED_TRACE | $P_STOPPED_SINGLE)
 
-if (osrelease[0] >= '7')
+if ($osrelease >= 7)
     set $P_INMEM = 0x10000000
 else
     set $PS_INMEM = 0x1
 end
 
-if (osrelease[0] >= '8')
+if ($osrelease >= 8)
     set $prison0 = &prison0
 else
     set $prison0 = 0
 end
 
-if (osrelease[0] >= '7')
+if ($osrelease >= 7)
 	set $LO_CLASSMASK = 0x0f000000
 	set $LO_CLASSSHIFT = 24
 end
 
-if (osrelease[0] >= '8')
+if ($osrelease >= 8)
     set $LK_SHARE = 0x01
     set $LK_SHARED_WAITERS = 0x02
     set $LK_EXCLUSIVE_WAITERS = 0x04
@@ -70,7 +73,7 @@ set $OBJT_PHYS = 4
 set $OBJT_DEAD = 5
 set $OBJT_SG = 6
 
-if (osrelease[0] > '6' || osrelease[2] >= '3')
+if (osreldate >= 603000)
     set $SX_LOCK_SHARED = 0x01
     set $SX_LOCK_FLAGMASK = 0x0f
     set $SX_SHARERS_SHIFT = 4
@@ -91,6 +94,23 @@ set $CTLTYPE_NODE = 1
 
 set $M_EXT = 0x0001
 set $M_PKTHDR = 0x0002
+
+set $IPPROTO_IP = 0
+set $IPPROTO_ICMP = 1
+set $IPPROTO_TCP = 6
+set $IPPROTO_UDP = 17
+
+set $TCPS_CLOSED = 0
+set $TCPS_LISTEN = 1
+set $TCPS_SYN_SENT = 2
+set $TCPS_SYN_RECEIVED = 3
+set $TCPS_ESTABLISHED = 4
+set $TCPS_CLOSE_WAIT = 5
+set $TCPS_FIN_WAIT_1 = 6
+set $TCPS_CLOSING = 7
+set $TCPS_LAST_ACK = 8
+set $TCPS_FIN_WAIT_2 = 9
+set $TCPS_TIME_WAIT = 10
 
 # Number of chars output by %p
 set $PTRWIDTH = (sizeof(void *) * 2 + 2)
@@ -274,7 +294,7 @@ define dumpthread
     if ($arg0->td_proc->p_flag & $P_SYSTEM)
 	printf "["
     end
-    if (osrelease[0] >= '7')
+    if ($osrelease >= 7)
 	if ($arg0->td_name[0] != '\0')
 	    printf "%s", $arg0->td_name
 	else
@@ -372,7 +392,7 @@ define procstate
 
     # Extra states
     set $i = 5
-    if (osrelease[0] >= '7')
+    if ($osrelease >= 7)
 	if (!($arg0->p_flag & $P_INMEM))
 	    printf "W"
 	    set $i = $i - 1
@@ -697,6 +717,22 @@ document allchains
 Displays all the contested lock thread chains in the system
 end
 
+define pcpu_first
+    if ($osrelease >= 8)
+	set $arg0 = cpuhead.stqh_first
+    else
+	set $arg0 = cpuhead.slh_first
+    end
+end
+
+define pcpu_next
+    if ($osrelease >= 8)
+	set $arg0 = $arg0->pc_allcpu.stqe_next
+    else
+	set $arg0 = $arg0->pc_allcpu.sle_next
+    end
+end
+
 # printpcpu <struct pcpu *>
 # helper function for pcpu and allpcpu
 define printpcpu
@@ -730,7 +766,7 @@ define printpcpu
 end
 
 define pcpu
-    set $p = cpuhead.slh_first
+    pcpu_first $p
     while ($p != 0)
 	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
@@ -739,7 +775,7 @@ define pcpu
 	    printpcpu $p
 	    set $p = 0
 	else
-	    set $p = $p->pc_allcpu.sle_next
+	    pcpu_next $p
 	end
     end
 end
@@ -749,14 +785,14 @@ Display per-CPU information for a specified CPU.
 end
 
 define allpcpu
-    set $p = cpuhead.slh_first
+    pcpu_first $p
     while ($p != 0)
 	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
 	end
 	printpcpu $p
 	printf "\n"
-	set $p = $p->pc_allcpu.sle_next
+	pcpu_next $p
     end
 end
 
@@ -800,7 +836,7 @@ define lockmgr_owner_new8
 end
 
 define lockmgr_owner
-    if (osrelease[0] >= '8')
+    if ($osrelease >= 8)
 	lockmgr_owner_new8 $arg0
     else
 	lockmgr_owner_old7 $arg0
@@ -858,7 +894,7 @@ define vtypename
 end
 
 define lockmgr_printinfo_old7
-    if (osrelease[0] == '7')
+    if ($osrelease == 7)
 	set $_name = $arg0->lk_object.lo_name
     else
 	set $_name = $arg0->lk_wmesg
@@ -915,7 +951,7 @@ define lockmgr_printinfo_new8
 end
 
 define lockmgr_printinfo
-    if (osrelease[0] >= '8')
+    if ($osrelease >= 8)
 	lockmgr_printinfo_new8 $arg0
     else
 	lockmgr_printinfo_old7 $arg0
@@ -962,7 +998,7 @@ define lockedvnodes
 	set $lvp = $mp->mnt_nvnodelist.tqh_first
 	while ($lvp != 0)
 	    if ($lvp->v_type != VMARKER)
-		if (osrelease[0] >= '8')
+		if ($osrelease >= 8)
 		    if ($lvp->v_vnlock->lk_lock != $LK_UNLOCKED)
 			vprint $lvp
 		    end
@@ -984,7 +1020,7 @@ List all of the locked vnodes in the system
 end
 
 define lock_class
-    if (osrelease[0] < '7')
+    if ($osrelease < 7)
 	set $arg1 = $arg0->lo_class
     else
 	set $arg1 = lock_classes[($arg0->lo_flags & $LO_CLASSMASK) >> \
@@ -1074,10 +1110,10 @@ define lk_chain_new8
 end
 
 define lk_chain
-    if (osrelease[0] >= '8')
+    if ($osrelease >= 8)
 	lk_chain_new8 $arg0 $arg1 $arg2
     else
-	if (osrelease[0] == '7')
+	if ($osrelease == 7)
 	    lk_chain_old7 $arg0 $arg1 $arg2
 	else
 	    lk_chain_old6 $arg0 $arg1 $arg2
@@ -1136,7 +1172,7 @@ define sx_chain_new6
 end
 
 define sx_chain
-    if (osrelease[0] == '6' && osrelease[2] < '3')
+    if (osreldate < 603000)
 	sx_chain_old6 $arg0 $arg1 $arg2
     else
 	sx_chain_new6 $arg0 $arg1 $arg2
@@ -1794,7 +1830,7 @@ define file_header
     printf "Data"
     set $foo = $PTRWIDTH - 4 - $foo
     spaces $foo
-    printf "  Flags   Count MCount Vnode\n"
+    printf "  Flags   Count Vnode\n"
 end
 
 define print_file
@@ -1804,8 +1840,8 @@ define print_file
 	set $foo = $PTRWIDTH - 3
 	space $foo
     end
-    printf " %p %08x %5d %6d %p\n", $arg0->f_data, $arg0->f_flag, \
-	$arg0->f_count, $arg0->f_msgcount, $arg0->f_vnode
+    printf " %p %08x %5d %p\n", $arg0->f_data, $arg0->f_flag, \
+	$arg0->f_count, $arg0->f_vnode
 end
 
 define file
@@ -1988,10 +2024,10 @@ define runq
 		else
 		    printf "      "
 		end
-		if (osrelease[0] >= '8')
+		if ($osrelease >= 8)
 		    set $td = $kse
 		else
-		    if (osrelease[0] == '7')
+		    if ($osrelease == 7)
 			set $td = $kse->ts_thread
 		    else
 			set $td = $kse->ke_thread
@@ -2007,10 +2043,10 @@ define runq
 		    printf "]"
 		end
 		printf "\n"
-		if (osrelease[0] >= '8')
+		if ($osrelease >= 8)
 		    set $kse = $td->td_runq.tqe_next
 		else
-		    if (osrelease[0] == '7')
+		    if ($osrelease == 7)
 			set $kse = $kse->ts_procq.tqe_next
 		    else
 			set $kse = $kse->ke_procq.tqe_next
@@ -2065,7 +2101,7 @@ end
 
 define runtds
     printf "CPU ticks pri    tid     pid   cmd\n"
-    set $p = cpuhead.slh_first
+    pcpu_first $p
     while ($p != 0)
 	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
 	    set $p = (struct pcpu *)cpu0prvpage
@@ -2082,7 +2118,7 @@ define runtds
 	    printf "]"
 	end	
 	printf "\n"
-	set $p = $p->pc_allcpu.sle_next
+	pcpu_next $p
     end
 end
 
@@ -2123,6 +2159,17 @@ set $IFT_ETHER = 0x6
 
 set $ETHER_ADDR_LEN = 6
 
+define bswap16
+    set $_local = $arg0
+    set $arg1 = ($_local & 0xff00) >> 8 | ($_local & 0xff) << 8
+end
+
+define bswap32
+    set $_local = $arg0
+    set $arg1 = ($_local >> 24) | ($_local >> 8 & 0xff00) | \
+        ($_local << 8 & 0xff0000) | ($_local << 24 & 0xff000000)
+end
+
 define print_ether_addr
     set $_cp = (unsigned char *)$arg0
     set $_i = 0
@@ -2140,14 +2187,18 @@ define print_ip
 end
 
 define print_port
-    set $_port = (uint16_t)$arg0
-    set $_port = ($_port & 0xff00) >> 8 | ($_port & 0xff) << 8
+    bswap16 $arg0 $_port
     printf "%d", $_port
 end
 
 define print_sin
-    set $_ip = &((struct sockaddr_in *)$arg0)->sin_addr
+    set $_sin = (struct sockaddr_in *)$arg0
+    set $_ip = &$_sin->sin_addr
     print_ip $_ip
+    if ($_sin->sin_port != 0)
+	printf ":"
+	print_port $_sin->sin_port
+    end
 end
 
 define print_sa
@@ -2325,7 +2376,7 @@ define inaddr
     printf ":"
     print_port $_ie.ie_fport
     printf "\n"
-    set $_imo = $arg0->inp_depend4.inp4_moptions
+    set $_imo = ((struct inpcb *)$arg0)->inp_depend4.inp4_moptions
     if ($_imo != 0)
 	imo $_imo
     end
@@ -2411,7 +2462,7 @@ end
 
 define sin
     set $_sin = (struct sockaddr_in *)$arg0
-    set $_port = $_sin->sin_port >> 8 | ($_sin->sin_port & 0xff) << 8
+    bswap16 $_sin->sin_port $_port
     printf "IP: "
     ip $_sin->sin_addr.s_addr
     printf "port: %d\n", $_port
@@ -2663,7 +2714,7 @@ end
 define kvm
     set $_entry = kernel_map->header.next
     set $_i = 0
-    if (osrelease[0] < '8')
+    if ($osrelease < 8)
 	set $_swapkeg = swap_zone->uz_keg
 	set $_callout = callout
     else
@@ -2840,7 +2891,7 @@ define ule_load_8
 end
 
 define ule_load
-    if (osrelease[0] >= '8')
+    if ($osrelease >= 8)
 	ule_load_8
     else
 	ule_load_7
@@ -2858,7 +2909,7 @@ set $SLP_DISCONN = 0x08
 set $SLP_GETSTREAM = 0x10
 set $SLP_LASTFRAG = 0x20
 
-define nfsd_sockets
+define nfsd_sockets_7
     set $valid = 0
     set $dorec = 0
     set $needq = 0
@@ -2895,11 +2946,114 @@ define nfsd_sockets
 	$lastfrag
 end
 
+define tcpstatename
+    if ($arg0 > $TCPS_TIME_WAIT)
+	printf "BAD: %d", $arg0
+    else
+	if ($arg0 > $TCPS_CLOSING)
+	    if ($arg0 == $TCPS_TIME_WAIT)
+		printf "TIME_WAIT"
+	    else
+		if ($arg0 == $TCPS_FIN_WAIT_2)
+		    printf "FIN_WAIT_2"
+		else
+		    printf "TCPS_LAST_ACK"
+		end
+	    end
+	else
+	    if ($arg0 > $TCPS_SYN_RECEIVED)
+		if ($arg0 > $TCPS_CLOSE_WAIT)
+		    if ($arg0 == $TCPS_CLOSING)
+			printf "CLOSING"
+		    else
+			printf "FIN_WAIT_1"
+		    end
+		else
+		    if ($arg0 == $TCPS_CLOSE_WAIT)
+			printf "CLOSE_WAIT"
+		    else
+			printf "ESTABLISHED"
+		    end
+		end
+	    else
+		if ($arg0 > $TCPS_LISTEN)
+		    if ($arg0 == $TCPS_SYN_RECEIVED)
+			printf "SYN_RECEIVED"
+		    else
+			printf "SYN_SENT"
+		    end
+		else
+		    if ($arg0 == $TCPS_LISTEN)
+			printf "LISTEN"
+		    else
+			printf "CLOSED"
+		    end
+		end
+	    end
+	end
+    end
+end
+
+define nfsd_sockets_8
+    set $_xprt = nfsrv_pool.sp_xlist.tqh_first
+    while ($_xprt != 0)
+	printf "%p: ", $_xprt->xp_socket
+	if ($_xprt->xp_ltaddr.ss_len != 0)
+	    print_sin &$_xprt->xp_ltaddr
+	else
+	    printf "ANY"
+	end
+	printf " -> "
+	if ($_xprt->xp_rtaddr.ss_len != 0)
+	    print_sin &$_xprt->xp_rtaddr
+	else
+	    printf "ANY"
+	end
+	if ($_xprt->xp_socket->so_proto->pr_protocol == $IPPROTO_TCP)
+	    set $_inp = (struct inpcb *)$_xprt->xp_socket->so_pcb
+	    set $_tp = (struct tcpcb *)$_inp->inp_ppcb
+	    printf " "
+	    tcpstatename $_tp->t_state
+	end
+	printf "\n"
+	set $_xprt = $_xprt->xp_link.tqe_next
+    end
+end
+
+define nfsd_sockets
+    if ($osrelease >= 8)
+	nfsd_sockets_8
+    else
+	nfsd_sockets_7
+    end
+end
+
+document nfsd_sockets
+Display stats about open NFS server client connections.
+end
+
 define futex_waiters
     set $f = (struct futex *)$arg0
     set $wp = $f->f_waiting_proc.tqh_first
     while ($wp != 0)
 	printf "wp: %p\n", $wp
 	set $wp = $wp->wp_list.tqe_next
+    end
+end
+
+define rusage
+    printf "%d  %d  %d  %d\n", $arg0.ru_nvcsw, $arg0.ru_nivcsw, \
+	$arg0.ru_inblock, $arg0.ru_oublock
+end
+
+define proc_rusage
+    printf "%8d: ", $arg0->p_pid
+    rusage $arg0->p_ru
+    set $_td = $arg0->p_threads.tqh_first
+    set $td = $arg0.p_threads.tqh_first
+    while ($td != 0)
+	printf "%8d: ", $td->td_tid
+	rusage $td->td_ru
+	set $td = $td->td_plist.tqe_next
     end
 end
