@@ -131,7 +131,7 @@ define pmap_kextract
 	end
     end
     if ($pa == -1)
-	printf "Invalid or unmapped address\n"
+	printf "Invalid, unmapped, or unfaulted address\n"
     else
 	printf "KVA %p => 0x%lx\n", $va, $pa
     end
@@ -157,7 +157,7 @@ define pmap_extract
 	end
     end
     if ($pa == -1)
-	printf "Invalid or unmapped address\n"
+	printf "Invalid, unmapped, or unfaulted address\n"
     else
 	printf "VA %p => 0x%lx\n", $va, $pa
     end
