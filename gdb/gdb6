@@ -65,6 +65,8 @@ set $MAP_ENTRY_NOFAULT = 0x0010
 
 set $MTX_UNOWNED = 4
 
+set $NCF_TS = 0x04
+
 set $OBJT_DEFAULT = 0
 set $OBJT_SWAP = 1
 set $OBJT_VNODE = 2
@@ -2136,6 +2138,7 @@ set $IFF_ALLMULTI = 0x200
 set $IFF_DRV_OACTIVE = 0x400
 set $IFF_SIMPLEX = 0x800
 set $IFF_MULTICAST = 0x8000
+set $IFF_CANTCONFIG = 0x10000
 set $IFF_PPROMISC = 0x20000
 set $IFF_MONITOR = 0x40000
 set $IFF_STATICARP = 0x80000
@@ -2144,13 +2147,25 @@ set $LINK_STATE_UNKNOWN = 0
 set $LINK_STATE_DOWN = 1
 set $LINK_STATE_UP = 2
 
-set $IFCAP_RXCSUM = 0x0001
-set $IFCAP_TXCSUM = 0x0002
-set $IFCAP_NETCONS = 0x0004
-set $IFCAP_VLAN_MTU = 0x0008
-set $IFCAP_VLAN_HWTAGGING = 0x0010
-set $IFCAP_JUMBO_MTU = 0x0020
-set $IFCAP_POLLING = 0x0040
+set $IFCAP_RXCSUM = 0x00001
+set $IFCAP_TXCSUM = 0x00002
+set $IFCAP_NETCONS = 0x00004
+set $IFCAP_VLAN_MTU = 0x00008
+set $IFCAP_VLAN_HWTAGGING = 0x00010
+set $IFCAP_JUMBO_MTU = 0x00020
+set $IFCAP_POLLING = 0x00040
+set $IFCAP_VLAN_HWCSUM = 0x00080
+set $IFCAP_TSO4 = 0x00100
+set $IFCAP_TSO6 = 0x00200
+set $IFCAP_LRO = 0x00400
+set $IFCAP_WOL_UCAST = 0x00800
+set $IFCAP_WOL_MCAST = 0x01000
+set $IFCAP_WOL_MAGIC = 0x02000
+set $IFCAP_TOE4 = 0x04000
+set $IFCAP_TOE6 = 0x08000
+set $IFCAP_VLAN_HWFILTER = 0x10000
+set $IFCAP_VLAN_HWTSO = 0x40000
+set $IFCAP_LINKSTATE = 0x80000
 
 set $AF_INET = 2
 set $AF_LINK = 18
@@ -2285,6 +2300,18 @@ define print_ifnet
 	print_flag $arg0->if_capenable $IFCAP_VLAN_HWTAGGING "VLAN_HWTAGGING" ","
 	print_flag $arg0->if_capenable $IFCAP_JUMBO_MTU "JUMBO_MTU" ","
 	print_flag $arg0->if_capenable $IFCAP_POLLING "POLLING" ","
+	print_flag $arg0->if_capenable $IFCAP_VLAN_HWCSUM "VLAN_HWCSUM" ","
+	print_flag $arg0->if_capenable $IFCAP_TSO4 "TSO4" ","
+	print_flag $arg0->if_capenable $IFCAP_TSO6 "TSO6" ","
+	print_flag $arg0->if_capenable $IFCAP_LRO "LRO" ","
+	print_flag $arg0->if_capenable $IFCAP_WOL_UCAST "WOL_UCAST" ","
+	print_flag $arg0->if_capenable $IFCAP_WOL_MCAST "WOL_MCAST" ","
+	print_flag $arg0->if_capenable $IFCAP_WOL_MAGIC "WOL_MAGIC" ","
+	print_flag $arg0->if_capenable $IFCAP_TOE4 "TOE4" ","
+	print_flag $arg0->if_capenable $IFCAP_TOE6 "TOE6" ","
+	print_flag $arg0->if_capenable $IFCAP_VLAN_HWFILTER "VLAN_HWFILTER" ","
+	print_flag $arg0->if_capenable $IFCAP_VLAN_HWTSO "VLAN_HWTSO" ","
+	print_flag $arg0->if_capenable $IFCAP_LINKSTATE "LINKSTATE" ","
 	printf ">\n"
     end
     set $ifa = $arg0->if_addrhead.tqh_first
@@ -2292,17 +2319,17 @@ define print_ifnet
 	print_ifa $ifa
 	set $ifa = $ifa->ifa_link.tqe_next
     end
-    printf "    link: "
     if ($arg0->if_data.ifi_link_state == $LINK_STATE_UP)
-	printf "UP"
+	printf "    link: UP\n"
     else
 	if ($arg0->if_data.ifi_link_state == $LINK_STATE_DOWN)
-	    printf "DOWN"
+	    printf "	link: DOWN\n"
 	else
-	    printf "???"
+	    if ($arg0->if_capenable & $IFCAP_LINKSTATE)
+		printf "    link: ???\n"
+	    end
 	end
     end
-    printf "\n"
     if ($arg0->if_dname[0] == 'v' && $arg0->if_dname[1] == 'l' && \
 	$arg0->if_dname[2] == 'a' && $arg0->if_dname[3] == 'n')
 	set $_ifv = (struct ifvlan *)$arg0->if_softc
@@ -2320,12 +2347,38 @@ define print_ifnet
 	end
 	printf "\n"
     end
+    if ($arg0->if_dname[0] == 'b' && $arg0->if_dname[1] == 'r' && \
+	$arg0->if_dname[2] == 'i' && $arg0->if_dname[3] == 'd' && \
+	$arg0->if_dname[4] == 'g' && $arg0->if_dname[5] == 'e')
+	set $_sc = (struct bridge_softc *)$arg0->if_softc
+	printf "    members:"
+	set $_bif = $_sc->sc_iflist.lh_first
+	while ($_bif != 0)
+	    printf " %s", $_bif->bif_ifp->if_xname
+	    set $_bif = $_bif->bif_next.le_next
+	end
+	printf "\n"
+	printf "    span ports:"
+	set $_bif = $_sc->sc_spanlist.lh_first
+	while ($_bif != 0)
+	    printf " %s", $_bif->bif_ifp->if_xname
+	    set $_bif = $_bif->bif_next.le_next
+	end
+	printf "\n"
+    else
+        if ($arg0->if_bridge != 0)
+	    set $_sc = (struct bridge_softc *)$arg0->if_bridge
+	    printf "    bridge: %s\n", $_sc->sc_ifp->if_xname
+	end
+    end
 end
 
 define ifconfig
     set $ifp = ifnet.tqh_first
     while ($ifp != 0)
-	print_ifnet $ifp
+        if (!($ifp->if_flags & $IFF_CANTCONFIG))
+	    print_ifnet $ifp
+	end
 	set $ifp = $ifp->if_link.tqe_next
     end
 end
@@ -2577,9 +2630,14 @@ define vpath
 	    else
 		set $_ncp = $_vp->v_cache_dst.tqh_first
 		if ($_ncp != 0)
+		    if ($_ncp->nc_flag & $NCF_TS)
+			set $_nc_name = ((struct namecache_ts *)$_ncp)->nc_name
+		    else
+			set $_nc_name = $_ncp->nc_name
+		    end
 		    set $_i = 0
 		    while ($_i < $_ncp.nc_nlen)
-			printf "%c", $_ncp.nc_name[$_i]
+			printf "%c", $_nc_name[$_i]
 			set $_i = $_i + 1
 		    end
 		    set $_vp = $_ncp->nc_dvp
@@ -2670,9 +2728,14 @@ document kqueue
 Enumerate the knotes belong to a kqueue.
 end
 
+# <start> <end>
+define kvm_range
+    printf "%lx - %lx (%10lx) ", $arg0, $arg1, (long)$arg1 - (long)$arg0
+end
+
 # <start> <end> <entry>
 define kmap_entry
-    printf "%lx - %lx ", $arg0, $arg1
+    kvm_range $arg0 $arg1
     if ($arg2->eflags & $MAP_ENTRY_IS_SUB_MAP)
 	set $_submap = $arg2->object.sub_map
 	if ($_submap == kmem_map)
@@ -2733,34 +2796,41 @@ define kvm
 	set $_bootstacks_end = 0
     end
     if ($_entry->start != kernel_map->header.start)
-	printf "%lx - %lx ----\n", kernel_map->header.start, $_entry->start
+	kvm_range kernel_map->header.start $_entry->start
+	printf "----\n"
     end
     while ($_i < kernel_map.nentries)
 	if (&_end >= $_entry->start && &_end <= $_entry->end)
-	    printf "%lx - %lx text/data/bss\n", $_entry->start, (long)&_end
-	    printf "%lx - %lx bootstrap data\n", (long)&_end, $_entry->end
+	    kvm_range $_entry->start (long)&_end
+	    printf "text/data/bss\n"
+	    kvm_range (long)&_end $_entry->end
+	    printf "bootstrap data\n"
 	else
 	    if ($_swapstart >= $_entry->start && $_swapend <= $_entry->end)
 		if ($_swapstart != $_entry->start)
 		    kmap_entry $_entry->start $_swapstart $_entry
 		end
-		printf "%lx - %lx swap zone\n", $_swapstart, $_swapend
+		kvm_range $_swapstart $_swapend
+		printf "swap zone\n"
 		if ($_swapend != $_entry->end)
 		    kmap_entry $_swapend $_entry->end $_entry
 		end
 	    else
 		if ($_entry->start == $_callout)
-		    printf "%lx - %lx callouts\n", (long)$_callout, (long)swbuf
-		    printf "%lx - %lx swbuf\n", (long)swbuf, (long)buf
-		    printf "%lx - %lx buf\n", (long)buf, $_entry->end
+		    kvm_range (long)$_callout (long)swbuf
+		    printf "callouts\n"
+		    kvm_range (long)swbuf (long)buf
+		    printf "swbuf\n"
+		    kvm_range (long)buf $_entry->end
+		    printf "buf\n" 
 		else
 		    if ($_bootstacks_start >= $_entry->start && \
 			$_bootstacks_end <= $_entry->end)
 			if ($_bootstacks_start != $_entry->start)
 			    kmap_entry $_entry->start $_bootstacks_start $_entry
 			end
-			printf "%lx - %lx AP stacks\n", $_bootstacks_start, \
-			    $_bootstacks_end
+			kvm_range $_bootstacks_start $_bootstacks_end
+			printf "AP stacks\n"
 			if ($_bootstacks_end != $_entry->end)
 			    kmap_entry $_bootstacks_end $_entry->end $_entry
 			end
@@ -2772,13 +2842,15 @@ define kvm
 	end
 	if ($_entry->next != &kernel_map.header && \
 	    $_entry->next->start != $_entry->end)
-	    printf "%lx - %lx ----\n", $_entry->end, $_entry->next->start
+	    kvm_range $_entry->end $_entry->next->start
+	    printf "----\n"
 	end
 	set $_entry = $_entry->next
 	set $_i = $_i + 1
     end
     if (kernel_map->header.prev->end < kernel_vm_end)
-	printf "%lx - %lx ----\n", kernel_map->header.prev->end, kernel_vm_end
+        kvm_range kernel_map->header.prev->end kernel_vm_end
+	printf "----\n"
     end
 end
 
@@ -3056,4 +3128,50 @@ define proc_rusage
 	rusage $td->td_ru
 	set $td = $td->td_plist.tqe_next
     end
+end
+
+set $SELTD_PENDING = 0x0001
+set $SELTD_RESCAN = 0x0002
+
+define seltd
+    printf "st_flags: "
+    if ($arg0->st_flags & $SELTD_PENDING)
+         printf "PENDING"
+	 if ($arg0->st_flags & $SELTD_RESCAN)
+	     printf ","
+	 end
+    end
+    if ($arg0->st_flags & $SELTD_RESCAN)
+         printf "RESCAN"
+    end
+    printf "\n"
+    set $_selfd = $arg0->st_selq.stqh_first
+    while ($_selfd != 0)
+        printf "  selinfo: %p", $_selfd->sf_si
+	set $_fd = (long)$_selfd->sf_cookie
+	if ($_fd > 100000000)
+	    set $_pfd = (struct pollfd *)$_selfd->sf_cookie
+	    printf " fd: %d  events: %x", $_pfd->fd, $_pfd->events
+	else
+	    printf " fd: %d", $_fd
+	end
+	printf "\n"
+        set $_selfd = $_selfd->sf_link.stqe_next
+    end
+end
+
+document seltd
+Display file descriptors a thread is waiting for in select/poll.
+end
+
+define selinfo
+    set $_selfd = ((struct selinfo *)$arg0)->si_tdlist.tqh_first
+    while ($_selfd != 0)
+        printf "stp: %p\n", $_selfd->sf_td
+        set $_selfd = $_selfd->sf_threads.tqe_next
+    end
+end
+
+document selinfo
+Display the list of seltd waiters waiting on a selinfo.
 end
