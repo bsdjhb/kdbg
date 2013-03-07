@@ -2439,6 +2439,29 @@ document inaddr
 Print out addresses for an inpcb.
 end
 
+define tcphc
+    set $_i = 0
+    while ($_i < tcp_hostcache.hashsize)
+	set $_hc_metrics = tcp_hostcache.hashbase[$_i].hch_bucket.tqh_first
+	while ($_hc_metrics != 0)
+		printf "%p: ", $_hc_metrics
+		if ($_hc_metrics.ip4.s_addr != 0)
+		    print_ip &$_hc_metrics.ip4.s_addr
+		else
+		    printf "IPV6"
+		end
+		printf " mtu %d ssthresh %d cwnd %d\n", $_hc_metrics->rmx_mtu, \
+		    $_hc_metrics->rmx_ssthresh, $_hc_metrics->rmx_cwnd
+		set $_hc_metrics = $_hc_metrics->rmx_q.tqe_next
+	end
+	set $_i = $_i + 1
+    end
+end
+
+document tcphc
+Print out the TCP hostcache entries.
+end
+
 define tcps
     set $_inp = tcbinfo.ipi_listhead.lh_first
     while ($_inp != 0)
@@ -2709,8 +2732,8 @@ end
 define kqueue
     set $_kq = (struct kqueue *)$arg0
     set $_i = 0
-    while ($_i < $kq->kq_knlistsize)
-	set $_kn = $kq->kq_knlist[$_i].slh_first
+    while ($_i < $_kq->kq_knlistsize)
+	set $_kn = $_kq->kq_knlist[$_i].slh_first
 	if ($_kn != 0)
 	    printf "fd %d:\n", $_i
 	    while ($_kn != 0)
@@ -3174,4 +3197,24 @@ end
 
 document selinfo
 Display the list of seltd waiters waiting on a selinfo.
+end
+
+define ttys
+    set $_tp = tty_list.tqh_first
+    while ($_tp != 0)
+        printf "%p:", $_tp
+	if ($_tp->t_dev)
+	    printf " %10s", $_tp->t_dev->si_name
+	else
+	    printf " (dead)    "
+	end
+	printf " sid %5u pgid %5u\n", \
+	    $_tp->t_session ? $_tp->t_session->s_sid : 0, \
+	    $_tp->t_pgrp ? $_tp->t_pgrp->pg_id : 0
+	set $_tp = $_tp->t_list.tqe_next
+    end
+end
+
+document ttys
+Display list of ttys.
 end
