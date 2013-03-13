@@ -5,6 +5,37 @@
 set $osrelease = osreldate / 100000
 
 # Macros
+set $B_AGE = 0x00000001
+set $B_NEEDCOMMIT = 0x00000002
+set $B_ASYNC = 0x00000004
+set $B_DIRECT = 0x00000008
+set $B_DEFERRED = 0x00000010
+set $B_CACHE = 0x00000020
+set $B_VALIDSUSPWRT = 0x00000040
+set $B_DELWRI = 0x00000080
+set $B_PERSISTENT = 0x00000100
+set $B_DONE = 0x00000200
+set $B_EINTR = 0x00000400
+set $B_INVAL = 0x00002000
+set $B_NOCACHE = 0x00008000
+set $B_MALLOC = 0x00010000
+set $B_CLUSTEROK = 0x00020000
+set $B_DIRTY = 0x00200000
+set $B_RELBUF = 0x00400000
+set $B_NEEDSGIANT = 0x02000000
+set $B_PAGING = 0x04000000
+set $B_MANAGED = 0x08000000
+set $B_RAM = 0x10000000
+set $B_VMIO = 0x20000000
+set $B_CLUSTER = 0x40000000
+set $B_REMFREE = 0x80000000
+
+set $BIO_READ = 0x01
+set $BIO_WRITE = 0x02
+set $BIO_DELETE = 0x04
+set $BIO_GETATTR = 0x08
+set $BIO_FLUSH = 0x10
+
 set $TDI_SUSPENDED = 0x1
 set $TDI_SLEEPING = 0x2
 set $TDI_SWAPPED = 0x4
@@ -49,7 +80,8 @@ if ($osrelease >= 8)
     set $LK_SHARE = 0x01
     set $LK_SHARED_WAITERS = 0x02
     set $LK_EXCLUSIVE_WAITERS = 0x04
-    set $LK_FLAGMASK = 0x07
+    set $LK_EXCLUSIVE_SPINNERS = 0x08
+    set $LK_FLAGMASK = 0x0f
     set $LK_SHARERS_SHIFT = 3
     set $LK_UNLOCKED = ((0) << $LK_SHARERS_SHIFT | $LK_SHARE)
     set $LK_KERNPROC = ((uintptr_t)(-1) & ~$LK_FLAGMASK)
@@ -825,7 +857,7 @@ define lockmgr_owner_new8
 		~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	end
     else
-	if (((struct lock *)$arg0)->lk_lock == $LK_KERNPROC)
+	if (((struct lock *)$arg0)->lk_lock & ~$LK_FLAGMASK == $LK_KERNPROC)
 	    printf "LK_KERNPROC\n"
 	else
 	    set $td = (struct thread *)(((struct lock *)$arg0)->lk_lock & \
@@ -932,7 +964,7 @@ define lockmgr_printinfo_new8
 		($arg0->lk_lock & ~$LK_FLAGMASK) >> $LK_SHARERS_SHIFT
 	else
 	    printf "lock type %s: EXCL by ", $arg0->lock_object.lo_name
-	    if ($arg0->lk_lock == $LK_KERNPROC)
+	    if (($arg0->lk_lock & ~$LK_FLAGMASK) == $LK_KERNPROC)
 		printf "LK_KERNPROC"
 	    else
 		set $_td = (struct thread *)($arg0->lk_lock & ~$LK_FLAGMASK)
@@ -940,14 +972,16 @@ define lockmgr_printinfo_new8
 	    end
 	end
     end
-    if ($arg0->lk_lock & $LK_EXCLUSIVE_WAITERS)
-	printf " with exclusive waiters pending"
-	if ($arg0->lk_lock & $LK_SHARED_WAITERS)
-	    printf "\n"
-	end
+    if ($arg0->lk_lock & ($LK_EXCLUSIVE_SPINNERS | $LK_EXCLUSIVE_WAITERS) && \
+        $arg0->lk_lock & $LK_SHARED_WAITERS)
+        printf " with exclusive and shared waiters pending"
     else
-	if ($arg0->lk_lock & $LK_SHARED_WAITERS)
-	    printf " with shared waiters pending"
+	if ($arg0->lk_lock & ($LK_EXCLUSIVE_SPINNERS | $LK_EXCLUSIVE_WAITERS))
+	    printf " with exclusive waiters pending"
+	else
+	    if ($arg0->lk_lock & $LK_SHARED_WAITERS)
+		printf " with shared waiters pending"
+	    end
 	end
     end
 end
@@ -1019,6 +1053,74 @@ end
 
 document lockedvnodes
 List all of the locked vnodes in the system
+end
+
+define bio_cmd
+    if ($arg0 == $BIO_READ)
+	printf "BIO_READ"
+    else
+	if ($arg0 == $BIO_WRITE)
+	    printf "BIO_WRITE"
+	else
+	    if ($arg0 == $BIO_DELETE)
+		printf "BIO_DELETE"
+	    else
+		if ($arg0 == $BIO_GETATTR)
+		    printf "BIO_GETATTR"
+		else
+		    if ($arg0 == $BIO_FLUSH)
+			printf "BIO_FLUSH"
+		    else
+			printf "%#0x", $arg0
+		    end
+		end
+	    end
+	end
+    end	
+end
+
+define bprint
+    set $_bp = (struct buf *)$arg0
+    printf "%p: ", $_bp
+    bio_cmd $_bp->b_iocmd
+    printf " flags ("
+    set $_comma = 0
+    print_flag $_bp->b_flags $B_AGE "AGE" "|"
+    print_flag $_bp->b_flags $B_NEEDCOMMIT "NEEDCOMMIT" "|"
+    print_flag $_bp->b_flags $B_ASYNC "ASYNC" "|"
+    print_flag $_bp->b_flags $B_DIRECT "DIRECT" "|"
+    print_flag $_bp->b_flags $B_DEFERRED "DEFERRED" "|"
+    print_flag $_bp->b_flags $B_CACHE "CACHE" "|"
+    print_flag $_bp->b_flags $B_VALIDSUSPWRT "VALIDSUSPWRT" "|"
+    print_flag $_bp->b_flags $B_DELWRI "DELWRI" "|"
+    print_flag $_bp->b_flags $B_PERSISTENT "PERSISTENT" "|"
+    print_flag $_bp->b_flags $B_DONE "DONE" "|"
+    print_flag $_bp->b_flags $B_EINTR "EINTR" "|"
+    print_flag $_bp->b_flags $B_INVAL "INVAL" "|"
+    print_flag $_bp->b_flags $B_NOCACHE "NOCACHE" "|"
+    print_flag $_bp->b_flags $B_MALLOC "MALLOC" "|"
+    print_flag $_bp->b_flags $B_CLUSTEROK "CLUSTEROK" "|"
+    print_flag $_bp->b_flags $B_DIRTY "DIRTY" "|"
+    print_flag $_bp->b_flags $B_RELBUF "RELBUF" "|"
+    print_flag $_bp->b_flags $B_NEEDSGIANT "NEEDSGIANT" "|"
+    print_flag $_bp->b_flags $B_PAGING "PAGING" "|"
+    print_flag $_bp->b_flags $B_MANAGED "MANAGED" "|"
+    print_flag $_bp->b_flags $B_RAM "RAM" "|"
+    print_flag $_bp->b_flags $B_VMIO "VMIO" "|"
+    print_flag $_bp->b_flags $B_CLUSTER "CLUSTER" "|"
+    print_flag $_bp->b_flags $B_REMFREE "REMFREE" "|"
+    printf ")\n"
+    printf "error = %d, bufsize = %ld, bcount = %ld, b_resid = %ld\n", \
+	$_bp->b_error, $_bp->b_bufsize, $_bp->b_bcount, $_bp->b_resid
+    printf "bufobj = %p, data = %p, blkno = %jd, dep = %p\n", \
+	$_bp->b_bufobj, $_bp->b_data, $_bp->b_blkno, $_bp->b_dep.lh_first
+    printf " "
+    lockmgr_printinfo $_bp->b_lock
+    printf "\n"
+end
+
+document bprint
+Display information about a buf
 end
 
 define lock_class
