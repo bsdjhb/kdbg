@@ -30,6 +30,11 @@ set $NPTEPGSHIFT = 0x9
 set $MC_STATUS_ADDRV = 0x0400000000000000
 set $MC_STATUS_MISCV = 0x0800000000000000
 
+set $VM_NFREEPOOL = 3
+set $VM_NFREELIST = 2
+set $VM_FREELIST_DEFAULT = 0
+set $VM_NFREEORDER = 13
+
 define pmap_pml4e
     set $_pm = (struct pmap *)$arg0
     set $_va = (long)$arg1

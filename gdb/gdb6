@@ -752,7 +752,7 @@ Displays all the contested lock thread chains in the system
 end
 
 define pcpu_first
-    if ($osrelease >= 8)
+    if ($osrelease >= 9)
 	set $arg0 = cpuhead.stqh_first
     else
 	set $arg0 = cpuhead.slh_first
@@ -760,7 +760,7 @@ define pcpu_first
 end
 
 define pcpu_next
-    if ($osrelease >= 8)
+    if ($osrelease >= 9)
 	set $arg0 = $arg0->pc_allcpu.stqe_next
     else
 	set $arg0 = $arg0->pc_allcpu.sle_next
@@ -771,6 +771,9 @@ end
 # helper function for pcpu and allpcpu
 define printpcpu
     printf "cpuid        = %d\n", $arg0->pc_cpuid
+    if ($osrelease >= 8)
+	printf "domain       = %d\n", $arg0->pc_domain
+    end
     printf "curthread    = "
     if ($arg0->pc_curthread != 0)
 	printf "%p: pid %d \"%s\"\n", $arg0->pc_curthread, \
@@ -3319,4 +3322,63 @@ end
 
 document ttys
 Display list of ttys.
+end
+
+define vm_phys_free
+    set $_flind = 0
+    while ($_flind < vm_nfreelists)
+	printf "\nFREE LIST %d:\n", $_flind
+	printf "\n  ORDER (SIZE)  |  NUMBER"
+	printf "\n              "
+	set $_pind = 0
+	while ($_pind < $VM_NFREEPOOL)
+	    printf "  |  POOL %d", $_pind
+	    set $_pind = $_pind + 1
+	end
+	printf "\n--            "
+	set $_pind = 0
+	while ($_pind < $VM_NFREEPOOL)
+	    printf "-- --      "
+	    set $_pind = $_pind + 1
+	end
+	printf "--\n"
+	set $_oind = $VM_NFREEORDER - 1
+	while ($_oind >= 0)
+	    printf "  %2d (%6dK)", $_oind, 1 << ($PAGE_SHIFT - 10 + $_oind)
+	    set $_pind = 0
+	    set $_oind = $_oind - 1
+	    while ($_pind < $VM_NFREEPOOL)
+		set $_fl = vm_phys_free_queues[$_flind][$_pind]
+		printf "  |  %6d", $_fl[$_oind].lcnt
+		set $_pind = $_pind + 1
+	    end
+	    printf "\n"
+	end
+	set $_flind = $_flind + 1
+    end
+end
+
+document vm_phys_free
+Output state of the physical memory allocator
+end
+
+define vm_phys_lookup_lists
+    set $_ndomains = vm_nfreelists - $VM_NFREELIST + 1
+    set $_domain = 0
+    while ($_domain < $_ndomains)
+	printf "DOMAIN %d:\n\n", $_domain
+	set $_flind = 0
+	while ($_flind < vm_nfreelists)
+	    set $_fl = vm_phys_lookup_lists[$_domain][$_flind]
+	    printf "  [%d]:\t%p (FREE LIST %d)\n", $_flind, $_fl, \
+	        $_fl - vm_phys_free_queues
+	    set $_flind = $_flind + 1
+	end
+	set $_domain = $_domain + 1
+	printf "\n"
+    end
+end
+
+document vm_phys_lookup_lists
+Output the set of free list lookup lists
 end
