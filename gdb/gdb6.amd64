@@ -6,6 +6,7 @@ set $DMAP_MAX_ADDRESS = 0xffffff8000000000
 set $PG_PDE_PAT = 0x1000
 set $PG_PTE_PAT = 0x80
 set $PG_PS = 0x80
+set $PG_A = 0x20
 set $PG_NC_PCD = 0x10
 set $PG_NC_PWT = 0x8
 set $PG_V = 0x1
