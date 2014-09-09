@@ -59,6 +59,19 @@ set $P_STOPPED_TRACE = 0x40000
 set $P_STOPPED_SINGLE = 0x80000
 set $P_STOPPED = ($P_STOPPED_SIG | $P_STOPPED_TRACE | $P_STOPPED_SINGLE)
 
+set $EVFILT_READ = -1
+set $EVFILT_WRITE = -2
+set $EVFILT_AIO = -3
+set $EVFILT_VNODE = -4
+set $EVFILT_PROC = -5
+set $EVFILT_SIGNAL = -6
+set $EVFILT_TIMER = -7
+set $EVFILT_PROCDESC = -8
+set $EVFILT_FS = -9
+set $EVFILT_LIO = -10
+set $EVFILT_USER = -11
+set $EVFILT_SENDFILE = -12
+
 if ($osrelease >= 7)
     set $P_INMEM = 0x10000000
 else
@@ -2019,7 +2032,11 @@ define fdp
 	file_header
 	set $_n = 0
 	while ($_n < $p->p_fd->fd_nfiles)
-	    set $_fp = $p->p_fd->fd_ofiles[$_n]
+	    if ($osrelease >= 10)
+		set $_fp = $p->p_fd->fd_ofiles[$_n].fde_file
+	    else	
+		set $_fp = $p->p_fd->fd_ofiles[$_n]
+	    end
 	    if ($_fp)
 		printf "%5d ", $_n
 		print_file $_fp
@@ -2831,6 +2848,132 @@ document vpath
 Walk the namecache to lookup the pathname of a vnode.
 end
 
+set $F_RDLCK = 1
+set $F_UNLCK = 2
+set $F_WRLCK = 3
+set $F_UNLCKSYS = 4
+set $F_CANCEL = 5
+set $F_WAIT = 0x10
+set $F_FLOCK = 0x20
+set $F_POSIX = 0x40
+set $F_REMOTE = 0x80
+set $F_NOINTR = 0x100
+
+define flock_flags
+    set $_comma = 0
+    if (($arg0 & 0xf) == $F_RDLCK)
+	printf "F_RDLCK"
+	set $_comma = 1
+    else
+	if (($arg0 & 0xf) == $F_UNLCK)
+	    printf "F_UNLCK"
+	    set $_comma = 1
+	else
+	    if (($arg0 & 0xf) == $F_WRLCK)
+		printf "F_WRLCK"
+		set $_comma = 1
+	    else
+		if (($arg0 & 0xf) == $F_UNLCKSYS)
+		    printf "F_UNLCKSYS"
+		    set $_comma = 1
+		else
+		    if (($arg0 & 0xf) == $F_CANCEL)
+			printf "F_CANCEL"
+			set $_comma = 1
+		    else
+			if (($arg0 & 0xf) != 0)
+			    printf "??? (%#x)", $arg0
+			    set $_comma = 1
+			end
+		    end
+		end
+	    end
+	end
+    end
+    print_flag $arg0 $F_WAIT "F_WAIT" "|"
+    print_flag $arg0 $F_FLOCK "F_FLOCK" "|"
+    print_flag $arg0 $F_POSIX "F_POSIX" "|"
+    print_flag $arg0 $F_REMOTE "F_REMOTE" "|"
+    print_flag $arg0 $F_NOINTR "F_NOINTR" "|"
+end
+
+define lockf_entry
+    printf "flags ("
+    flock_flags $arg0->lf_flags
+    printf ") type ("
+    flock_flags $arg0->lf_type
+    printf ") range %#x-%#x", $arg0->lf_start, $arg0->lf_end
+    printf " by pid %d sysid %d\n", $arg0->lf_owner->lo_pid, \
+	$arg0->lf_owner->lo_sysid
+end
+
+define vlockf
+    set $_vp = (struct vnode *)$arg0
+    if ($_vp->v_lockf != 0)
+	printf "%p: %d references\n", $_vp, $_vp->v_lockf->ls_threads
+	set $_lf = $_vp->v_lockf->ls_active.lh_first
+	if ($_lf != 0)
+	    printf "  active locks:\n"
+	    while ($_lf != 0)
+		printf "    "
+		lockf_entry $_lf
+		set $_lf = $_lf->lf_link.le_next
+	    end
+	end
+	set $_lf = $_vp->v_lockf->ls_pending.lh_first
+	if ($_lf != 0)
+	    printf "  pending locks:\n"
+	    while ($_lf != 0)
+		printf "    "
+		lockf_entry $_lf
+		set $_lf = $_lf->lf_link.le_next
+	    end
+	end
+    end
+end
+
+document vlockf
+Print info about file locks on a vnode.
+end
+
+define vlockf_waiters
+    set $_vp = (struct vnode *)$arg0
+    if ($_vp->v_lockf != 0)
+	set $_read = 0
+	set $_write = 0
+	set $_ls = $_vp->v_lockf->ls_pending.lh_first
+	while ($_ls != 0)
+	    if ($_ls->lf_type == $F_RDLCK)
+		set $_read = $_read + 1
+	    else
+	        if ($_ls->lf_type == $F_WRLCK)
+		    set $_write = $_write + 1
+		end
+	    end
+	    set $_ls = $_ls->lf_link.le_next
+	end
+	printf "%d readers, %d writers\n", $_read, $_write
+    end
+end
+
+define vlocks
+    set $_ls = lf_lock_states->lh_first
+    while ($_ls != 0)
+        set $_lf = $_ls->ls_active.lh_first
+	while ($_lf != 0)
+	    set $_vp = $_lf->lf_vnode
+	    printf "vp %p: (%s) ",  $_vp, $_vp->v_mount.mnt_stat.f_mntonname
+	    lockf_entry $_lf
+	    set $_lf = $_lf->lf_link.le_next
+	end
+	set $_ls = $_ls->ls_link.le_next
+    end
+end
+
+document vlocks
+List all held file locks.
+end
+
 define nfsfh
     set $_vp = (struct vnode *)$arg0
     set $_np = (struct nfsnode *)$_vp->v_data
@@ -2883,16 +3026,69 @@ document dirhash
 Display directory hash for a UFS directory vnode.
 end
 
+define evfilt_name
+    if ($arg0 == $EVFILT_READ)
+	printf "EVFILT_READ"
+    else
+	if ($arg0 == $EVFILT_WRITE)
+	    printf "EVFILT_WRITE"
+	else
+	    if ($arg0 == $EVFILT_AIO)
+	        printf "EVFILT_AIO"
+	    else
+	        if ($arg0 == $EVFILT_VNODE)
+		    printf "EVFILT_VNODE"
+		else
+		    if ($arg0 == $EVFILT_PROC)
+		        printf "EVFILT_PROC"
+		    else
+		        if ($arg0 == $EVFILT_SIGNAL)
+			    printf "EVFILT_SIGNAL"
+			else
+			    if ($arg0 == $EVFILT_TIMER)
+			        printf "EVFILT_TIMER"
+			    else
+			        if ($arg0 == $EVFILT_PROCDESC)
+				    printf "EVFILT_PROCDESC"
+				else
+				    if ($arg0 == $EVFILT_FS)
+				        printf "EVFILT_FS"
+				    else
+				        if ($arg0 == $EVFILT_LIO)
+					    printf "EVFILT_LIO"
+					else
+					    if ($arg0 == $EVFILT_USER)
+					        printf "EVFILT_USER"
+					    else
+					        if ($arg0 == $EVFILT_SENDFILE)
+						    printf "EVFILT_SENDFILE"
+						else
+						    printf "%d", $arg0
+						end
+					    end
+					end
+				    end
+				end
+			    end
+			end
+		    end
+		end
+	    end
+	end
+    end
+end
+
 define kqueue
     set $_kq = (struct kqueue *)$arg0
     set $_i = 0
     while ($_i < $_kq->kq_knlistsize)
 	set $_kn = $_kq->kq_knlist[$_i].slh_first
 	if ($_kn != 0)
-	    printf "fd %d:\n", $_i
+	    printf "ident %d:\n", $_i
 	    while ($_kn != 0)
-		printf "  filter %d flags %d udata %p\n", \
-		    $_kn->kn_kevent.filter, $_kn->kn_kevent.flags, \
+		printf "  filter "
+		evfilt_name $_kn->kn_kevent.filter
+		printf " flags %d udata %p\n", $_kn->kn_kevent.flags, \
 		    $_kn->kn_kevent.udata
 		set $_kn = $_kn->kn_link.sle_next
 	    end
@@ -3331,7 +3527,7 @@ define seltd
     while ($_selfd != 0)
         printf "  selinfo: %p", $_selfd->sf_si
 	set $_fd = (long)$_selfd->sf_cookie
-	if ($_fd > 100000000)
+	if ($_fd < 0 || $_fd > 100000000)
 	    set $_pfd = (struct pollfd *)$_selfd->sf_cookie
 	    printf " fd: %d  events: %x", $_pfd->fd, $_pfd->events
 	else
