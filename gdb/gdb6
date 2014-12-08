@@ -2055,7 +2055,7 @@ define fdp_11
 	file_header
 	set $_n = 0
 	while ($_n < $p->p_fd->fd_files->fdt_nfiles)
-	    set $_fp = $p->p_fd->fd_files->fdt_ofiles[$_n]
+	    set $_fp = $p->p_fd->fd_files->fdt_ofiles[$_n].fde_file
 	    if ($_fp)
 		printf "%5d ", $_n
 		print_file $_fp
