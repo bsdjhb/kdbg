@@ -2023,7 +2023,7 @@ document file
 Display details about a file descriptor.
 end
 
-define fdp
+define fdp_10
     lookup_proc $arg0 $p
     if ($p->p_fd == 0)
 	printf "pid %d has no files\n", $p->p_pid
@@ -2043,6 +2043,33 @@ define fdp
 	    end
 	    set $_n = $_n + 1
 	end
+    end
+end
+
+define fdp_11
+    lookup_proc $arg0 $p
+    if ($p->p_fd == 0 || $p->p_fd->fd_files == 0)
+	printf "pid %d has no files\n", $p->p_pid
+    else
+	printf "Index "
+	file_header
+	set $_n = 0
+	while ($_n < $p->p_fd->fd_files->fdt_nfiles)
+	    set $_fp = $p->p_fd->fd_files->fdt_ofiles[$_n]
+	    if ($_fp)
+		printf "%5d ", $_n
+		print_file $_fp
+	    end
+	    set $_n = $_n + 1
+	end
+    end
+end
+
+define fdp
+    if (osreldate < 1100046)
+	fdp_10 $arg0
+    else
+	fdp_11 $arg0
     end
 end
 
