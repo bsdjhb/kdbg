@@ -1,8 +1,13 @@
 # $Id$
 # amd64-specific kernel macros
 
-set $DMAP_MIN_ADDRESS = 0xffffff0000000000
-set $DMAP_MAX_ADDRESS = 0xffffff8000000000
+if (osreldate >= 1000046)
+    set $DMAP_MIN_ADDRESS = 0xfffff80000000000
+    set $DMAP_MAX_ADDRESS = 0xfffffc0000000000
+else
+    set $DMAP_MIN_ADDRESS = 0xffffff0000000000
+    set $DMAP_MAX_ADDRESS = 0xffffff8000000000
+end
 set $PG_PDE_PAT = 0x1000
 set $PG_PTE_PAT = 0x80
 set $PG_PS = 0x80
