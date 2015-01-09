@@ -3858,3 +3858,35 @@ end
 document big_objs
 Display VM objects larger than a specific size.
 end
+
+define ktrdump
+    set $_first = -1
+    set $_cur = (ktr_idx - 1) % ktr_entries
+    while ($_first != $_cur)
+	set $_kp = ktr_buf + $_cur
+	if ($_kp->desc == 0)
+	    set $_cur = $_first
+	else
+	    printf "%d (%p", $_cur, $_kp->ktr_thread
+	    if (mp_ncpus > 0)
+		printf ":cpu%d", $_kp->ktr_cpu
+	    end
+	    printf "): "
+	    printf $_kp->ktr_desc, $_kp->ktr_parms[0], $_kp->ktr_parms[1], \
+		$_kp->ktr_parms[2], $_kp->ktr_parms[3], $_kp->ktr_parms[4], \
+		$_kp->ktr_parms[5]
+	    printf "\n"
+	    if ($_first == -1)
+		set $_first == $_cur
+	    if ($_cur == 0)
+		set $_cur = ktr_entries - 1;
+	    else
+	        set $_cur = $_cur - 1
+	    end
+	end
+    end
+end
+
+document ktrdump
+Display KTR trace buffer.
+end
