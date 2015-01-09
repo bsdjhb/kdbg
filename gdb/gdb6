@@ -3864,7 +3864,7 @@ define ktrdump
     set $_cur = (ktr_idx - 1) % ktr_entries
     while ($_first != $_cur)
 	set $_kp = ktr_buf + $_cur
-	if ($_kp->desc == 0)
+	if ($_kp->ktr_desc == 0)
 	    set $_cur = $_first
 	else
 	    printf "%d (%p", $_cur, $_kp->ktr_thread
