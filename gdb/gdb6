@@ -3133,28 +3133,55 @@ define kvm_range
     printf "%lx - %lx (%10lx) ", $arg0, $arg1, (long)$arg1 - (long)$arg0
 end
 
+define submap_name_9
+    if ($_submap == kmem_map)
+	printf "kmem_map"
+    else
+	if ($_submap == pipe_map)
+	    printf "pipe_map"
+	else
+	    if ($_submap == exec_map)
+		printf "exec_map"
+	    else
+		if ($_submap->header.next->object.sub_map == buffer_map)
+		    printf "buffer_map + pager_map"
+		else
+		    printf "map %p", $_submap
+		end
+	    end
+	end
+    end
+end
+
+define submap_name_10
+    if ($_submap == pipe_map)
+	printf "pipe_map"
+    else
+	if ($_submap == exec_map)
+	    printf "exec_map"
+	else
+	    if ($_submap->header.next->object.sub_map == buffer_map)
+		printf "buffer_map + pager_map"
+	    else
+		printf "map %p", $_submap
+	    end
+	end
+    end
+end
+
+define submap_name
+    if ($osrelease >= 10)
+	submap_name_10 $arg0
+    else
+	submap_name_9 $arg0
+    end
+end
+
 # <start> <end> <entry>
 define kmap_entry
     kvm_range $arg0 $arg1
     if ($arg2->eflags & $MAP_ENTRY_IS_SUB_MAP)
 	set $_submap = $arg2->object.sub_map
-	if ($_submap == kmem_map)
-	    printf "kmem_map"
-	else
-	    if ($_submap == pipe_map)
-		printf "pipe_map"
-	    else
-		if ($_submap == exec_map)
-		    printf "exec_map"
-		else
-		    if ($_submap->header.next->object.sub_map == buffer_map)
-			printf "buffer_map + pager_map"
-		    else
-			printf "map %p", $_submap
-		    end
-		end
-	    end
-	end
     else
 	if ($arg2->object.vm_object != 0)
 	    set $_obj = $arg2->object.vm_object
