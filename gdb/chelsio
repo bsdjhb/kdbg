@@ -1,0 +1,290 @@
+# Chelsio-specific kernel macros
+
+# T3 commands
+
+# For each cxgb device, execute $arg0 passing the port_info structure as the
+# argument
+define fe_cxgb
+    set $dev = root_bus
+    set $ignore = 0
+    while ($dev != 0)
+	if ($dev->nameunit != 0 && $ignore == 0)
+	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
+	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
+		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
+		set $pi = (struct port_info *)$dev->softc
+		$arg0 $pi
+	    end
+	end
+	if ($dev->children.tqh_first != 0 && $ignore == 0)
+	    set $dev = $dev->children.tqh_first
+	    set $ignore = 0
+	else
+	    if ($dev->link.tqe_next != 0)
+		set $dev = $dev->link.tqe_next
+		set $ignore = 0
+	    else
+		set $dev = $dev->parent
+		set $ignore = 1
+	    end
+	end
+    end
+end
+
+# For each cxgbc device, execute $arg0 passing the adapter structure as the
+# argument
+define fe_cxgbc
+    set $dev = root_bus
+    set $ignore = 0
+    while ($dev != 0)
+	if ($dev->nameunit != 0 && $ignore == 0)
+	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
+	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
+		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
+		if ($dev->parent->children.tqh_first == $dev)
+		    set $pi = (struct port_info *)$dev->softc
+		    $arg0 $pi->adapter
+		end
+	    end
+	end
+	if ($dev->children.tqh_first != 0 && $ignore == 0)
+	    set $dev = $dev->children.tqh_first
+	    set $ignore = 0
+	else
+	    if ($dev->link.tqe_next != 0)
+		set $dev = $dev->link.tqe_next
+		set $ignore = 0
+	    else
+		set $dev = $dev->parent
+		set $ignore = 1
+	    end
+	end
+    end
+end
+
+define tcam_helper
+    printf "%s: %d entries", $arg0->dev->nameunit, $arg0->mc5.tcam_size
+    if ($arg0->params.offload)
+        printf " (offload)"
+    end
+    printf "\n"
+end
+    
+define tcam
+    fe_cxgbc tcam_helper
+end
+
+document tcam
+Display number of TCAM entries for any Chelsio T3 adapters.
+end
+
+define filters_helper
+    if ($arg0->filters != 0)
+	printf "%s: %d filters:\n", $arg0->dev->nameunit, \
+	    $arg0->params.mc5.nfilters
+	set $i = 0
+	while ($i < $arg0->params.mc5.nfilters)
+	    set $f = $arg0->filters + $i
+	    if ($f->valid)
+		printf "%6d: ", $i
+		print_ip &$f->sip
+		printf ":"
+		printf "%d ", $f->sport
+		print_ip &$f->dip
+		printf ":"
+		printf "%d ", $f->dport
+		if ($f->vlan != 0xfff)
+		    printf "vlan %d ", $f->vlan
+		end
+		if ($f->pkt_type == 0)
+		    printf "ANY  "
+		else
+		    if ($f->pkt_type == 1)
+			printf "TCP  "
+		    else
+			if ($f->pkt_type == 2)
+			    printf "UDP  "
+			else
+			    printf "FRAG "
+			end
+		    end
+		end
+		if ($f->pass)
+		    printf "PASS "
+		else
+		    printf "DROP "
+		end
+		if ($f->rss == 0)
+		    printf "Q:%d", $f->qset
+		else
+		    printf "RSS"
+		end
+		if ($f->locked)
+		    printf " LK"
+		end
+		printf "\n"
+	    end
+	    set $i = $i + 1
+	end
+    end
+end
+
+define filters
+    fe_cxgbc filters_helper
+end
+
+document filters
+Display filter rules for any Chelsio T3 adapters.
+end
+
+define ctrlq_helper
+    set $txq = $arg0->sge.qs[0].txq[2]
+    printf "%s: size %d in_use %d processed %d cleaned %d\n", \
+	$arg0->dev->nameunit, $txq->size, $txq->in_use, $txq->processed, \
+	$txq->cleaned
+end
+
+define ctrlq
+    fe_cxgbc ctrlq_helper
+end
+
+document ctrlq
+Display ctrlq stats for any Chelsio T3 adapters.
+end
+
+set $F_RSPD_GEN2 = 1
+
+define qset
+    set $qs = (struct sge_qset *)$arg0
+    printf "queueset %d:\n", $qs - $qs->port->adapter.sge.qs
+    set $pending = 0
+    set $idx = $qs->rspq.cidx
+    set $r = $qs->rspq.desc[$idx]
+    set $gen = $qs->rspq.gen
+    while ($idx >= 0 && ($r->intr_gen & $F_RSPD_GEN2) == $gen)
+	set $pending = $pending + 1
+	set $idx = $idx + 1
+	if ($idx == $qs->rspq.size)
+	    set $idx = 0
+	    set $gen = $gen ^ 1
+	end
+	if ($idx == $qs->rspq.cidx)
+	    set $idx = -1
+	end
+	set $r = $qs->rspq.desc[$idx]
+    end
+    printf " rspq size: %d  cidx: %d  credits: %d pending: %d\n", \
+	$qs->rspq.size, $qs->rspq.cidx, $qs->rspq.credits, $pending
+    printf "  fl0 size: %d  cidx: %d\n", $qs->fl[0].size, $qs->fl[0].cidx
+    printf "  fl1 size: %d  cidx: %d\n", $qs->fl[1].size, $qs->fl[1].cidx
+end
+
+document qset
+Display stats about a SGE qset.
+end
+
+define qsets_helper
+    printf "%s: queue sets:\n", $arg0->ifp->if_xname
+    set $i = 0
+    while ($i < $arg0->nqsets)
+	set $qs = $arg0->adapter->sge.qs + $arg0->first_qset + $i
+	printf "  %d: %p\n", $qs - $arg0->adapter->sge.qs, $qs
+	set $i = $i + 1
+    end
+end
+
+define qsets
+    fe_cxgb qsets_helper
+end
+
+document qsets
+List T3 queue sets.
+end
+
+define txd
+    set $txd = $arg0
+    set $cpl = (struct cpl_tx_pkt *)$txd
+    if ($osrelease >= '8')
+        bswap32 $cpl->wr.u.ilp32.wr_lo $_wrlo
+	bswap32 $cpl->wr.u.ilp32.wr_hi $_wrhi
+    else
+        bswap32 $cpl->wr.wr_lo $_wrlo
+	bswap32 $cpl->wr.wr_hi $_wrhi
+    end
+    printf "wr hi: 0x%08lx  lo: 0x%08lx\n", $_wrhi, $_wrlo
+    bswap32 $cpl->cntrl $_cntrl
+    bswap32 $cpl->len $_len
+    printf "cntrl: 0x%08lx len: %u\n", $_cntrl, $_len & ~0x80000000
+end
+
+document txd
+Dump T3 tx descriptor state.
+end
+
+# T4/T5 commands
+
+set $S_RSPD_GEN = 7
+set $M_RSPD_LEN = 0x7fffffff
+
+set $S_RSPD_TYPE = 4
+set $M_RSPD_TYPE = 0x3
+
+set $X_RSPD_TYPE_FLBUF = 0
+set $X_RSPD_TYPE_CPL = 1
+set $X_RSPD_TYPE_INTR = 2
+
+define iq_msg
+    set $_offset = (char *)$arg0->desc + ($arg1 * $arg0->esize)
+    set $_ctrl = (struct rsp_ctrl *)($_offset + ($arg0->esize - sizeof(struct rsp_ctrl)))
+    set $_rspd_type = ($_ctrl->u.type_gen >> $S_RSPD_TYPE) & $M_RSPD_TYPE
+    set $_rss = (struct rss_header *)$_offset
+    set $_cpl = (struct cpl_rx_pkt *)($_rss + 1)
+    printf "[%2d]: gen %d type %d", $arg1, $_ctrl->u.type_gen >> $S_RSPD_GEN, \
+        $_rspd_type
+    bswap32 $_ctrl->pldbuflen_qid $_lq
+    if $_rspd_type == $X_RSPD_TYPE_FLBUF
+        bswap16 $_rss->qid $_qid
+        printf " FLBUF  qid: %d len: %d", $_qid, $_lq & $M_RSPD_LEN
+        if ($_cpl->vlan_ex)
+             bswap16 $_cpl->vlan $_vlan
+	     printf " vlan: %d", $_vlan
+        end
+    else
+        if $_rspd_type == $X_RSPD_TYPE_CPL
+            printf " CPL  "
+        else
+            printf " INTR "
+        end
+    end
+    printf "\n"
+end
+
+define intrq
+    printf "cntxt_id: %d  qsize: %d\n", \
+        $arg0->cntxt_id, $arg0->qsize
+    set $_i = 0
+    while ($_i < $arg0->qsize)
+        iq_msg $arg0 $_i
+        set $_i = $_i + 1
+    end
+end
+
+define eq
+    printf "cntxt_id: %d  qsize: %d  cap:  %d\n", \
+        $arg0->cntxt_id, $arg0->qsize, $arg0->cap
+    bswap32 $arg0->spg->qid $_qid
+    bswap16 $arg0->spg->cidx $_cidx
+    bswap16 $arg0->spg->pidx $_pidx
+    printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
+end
+
+define iq
+    printf "cntxt_id: %d  qsize: %d\n", \
+        $arg0->cntxt_id, $arg0->qsize
+    set $_offset = (char *)$arg0->desc + (($arg0->qsize - 1) * $arg0->esize)
+    set $_iq_spg = (struct sge_qstat *)$_offset
+    bswap32 $_iq_spg->qid $_qid
+    bswap16 $_iq_spg->cidx $_cidx
+    bswap16 $_iq_spg->pidx $_pidx
+    printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
+end
