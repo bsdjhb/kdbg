@@ -4,62 +4,40 @@
 
 # For each cxgb device, execute $arg0 passing the port_info structure as the
 # argument
-define fe_cxgb
-    set $dev = root_bus
-    set $ignore = 0
-    while ($dev != 0)
-	if ($dev->nameunit != 0 && $ignore == 0)
-	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
-	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
-		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
-		set $pi = (struct port_info *)$dev->softc
-		$arg0 $pi
-	    end
-	end
-	if ($dev->children.tqh_first != 0 && $ignore == 0)
-	    set $dev = $dev->children.tqh_first
-	    set $ignore = 0
-	else
-	    if ($dev->link.tqe_next != 0)
-		set $dev = $dev->link.tqe_next
-		set $ignore = 0
-	    else
-		set $dev = $dev->parent
-		set $ignore = 1
-	    end
+define fe_cxgb_helper
+    if ($arg1->nameunit != 0)
+	if ($arg1->nameunit[0] == 'c' && $arg1->nameunit[1] == 'x' && \
+	    $arg1->nameunit[2] == 'g' && $arg1->nameunit[3] == 'b' && \
+	    $arg1->nameunit[4] >= '0' && $arg1->nameunit[4] <= '9')
+	    set $pi = (struct port_info *)$arg1->softc
+	    $arg0 $pi
 	end
     end
 end
 
+define fe_cxgb
+    devwalk fe_cxgb_helper $arg0
+end
+
 # For each cxgbc device, execute $arg0 passing the adapter structure as the
-# argument
-define fe_cxgbc
-    set $dev = root_bus
-    set $ignore = 0
-    while ($dev != 0)
-	if ($dev->nameunit != 0 && $ignore == 0)
-	    if ($dev->nameunit[0] == 'c' && $dev->nameunit[1] == 'x' && \
-	        $dev->nameunit[2] == 'g' && $dev->nameunit[3] == 'b' && \
-		$dev->nameunit[4] >= '0' && $dev->nameunit[4] <= '9')
-		if ($dev->parent->children.tqh_first == $dev)
-		    set $pi = (struct port_info *)$dev->softc
-		    $arg0 $pi->adapter
-		end
-	    end
-	end
-	if ($dev->children.tqh_first != 0 && $ignore == 0)
-	    set $dev = $dev->children.tqh_first
-	    set $ignore = 0
-	else
-	    if ($dev->link.tqe_next != 0)
-		set $dev = $dev->link.tqe_next
-		set $ignore = 0
-	    else
-		set $dev = $dev->parent
-		set $ignore = 1
+# argument.  Note that we can't do a cast of the cxgbc softc directly,
+# so instead this finds the first cxgb device on each controller and uses
+# pi->adapter.
+define fe_cxgbc_helper
+    if ($arg1->nameunit != 0)
+	if ($arg1->nameunit[0] == 'c' && $arg1->nameunit[1] == 'x' && \
+	    $arg1->nameunit[2] == 'g' && $arg1->nameunit[3] == 'b' && \
+	    $arg1->nameunit[4] >= '0' && $arg1->nameunit[4] <= '9')
+	    if ($arg1->parent->children.tqh_first == $arg1)
+		set $pi = (struct port_info *)$arg1->softc
+		$arg0 $pi->adapter
 	    end
 	end
     end
+end
+    
+define fe_cxgbc
+    devwalk fe_cxgbc_helper $arg0
 end
 
 define tcam_helper
@@ -223,6 +201,30 @@ end
 
 # T4/T5 commands
 
+# For each cxgbe or cxl device, execute $arg0 passing the port_info
+# structure as the argument
+define fe_cxgbe_helper
+    if ($arg1->nameunit != 0)
+	if ($arg1->nameunit[0] == 'c' && $arg1->nameunit[1] == 'x' && \
+	    $arg1->nameunit[2] == 'g' && $arg1->nameunit[3] == 'b' && \
+	    $arg1->nameunit[4] == 'e' && \
+	    $arg1->nameunit[5] >= '0' && $arg1->nameunit[5] <= '9')
+	    set $pi = (struct port_info *)$arg1->softc
+	    $arg0 $pi
+	end
+	if ($arg1->nameunit[0] == 'c' && $arg1->nameunit[1] == 'x' && \
+	    $arg1->nameunit[2] == 'l' && \
+	    $arg1->nameunit[3] >= '0' && $arg1->nameunit[3] <= '9')
+	    set $pi = (struct port_info *)$arg1->softc
+	    $arg0 $pi
+	end
+    end
+end
+
+define fe_cxgbe
+    devwalk fe_cxgbe_helper $arg0
+end
+
 set $S_RSPD_GEN = 7
 set $M_RSPD_LEN = 0x7fffffff
 
@@ -260,31 +262,51 @@ define iq_msg
 end
 
 define intrq
-    printf "cntxt_id: %d  qsize: %d\n", \
-        $arg0->cntxt_id, $arg0->qsize
+    set $_iq = (struct sge_iq *)$arg0
+    printf "cntxt_id: %d  qsize: %d\n", $_iq->cntxt_id, $_iq->qsize
     set $_i = 0
-    while ($_i < $arg0->qsize)
-        iq_msg $arg0 $_i
+    while ($_i < $_iq->qsize)
+        iq_msg $_iq $_i
         set $_i = $_i + 1
     end
 end
 
 define eq
+    set $_eq = (struct sge_eq *)$arg0
     printf "cntxt_id: %d  qsize: %d  cap:  %d\n", \
-        $arg0->cntxt_id, $arg0->qsize, $arg0->cap
-    bswap32 $arg0->spg->qid $_qid
-    bswap16 $arg0->spg->cidx $_cidx
-    bswap16 $arg0->spg->pidx $_pidx
+        $_eq->cntxt_id, $_eq->qsize, $_eq->cap
+    bswap32 $_eq->spg->qid $_qid
+    bswap16 $_eq->spg->cidx $_cidx
+    bswap16 $_eq->spg->pidx $_pidx
     printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
 end
 
 define iq
+    set $_iq = (struct sge_iq *)$arg0
     printf "cntxt_id: %d  qsize: %d\n", \
-        $arg0->cntxt_id, $arg0->qsize
-    set $_offset = (char *)$arg0->desc + (($arg0->qsize - 1) * $arg0->esize)
+        $_iq->cntxt_id, $_iq->qsize
+    set $_offset = (char *)$_iq->desc + (($_iq->qsize - 1) * $_iq->esize)
     set $_iq_spg = (struct sge_qstat *)$_offset
     bswap32 $_iq_spg->qid $_qid
     bswap16 $_iq_spg->cidx $_cidx
     bswap16 $_iq_spg->pidx $_pidx
     printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
+end
+
+define queues_helper
+    printf "%s: queues:\n", $arg0->ifp->if_xname
+    set $i = 0
+    while ($i < $arg0->nrxq)
+	printf "  rxq %d: %p\n", $i, $arg0->adapter->sge.rxq + $arg0->first_rxq + $i
+	set $i = $i + 1
+    end
+    set $i = 0
+    while ($i < $arg0->ntxq)
+	printf "  txq %d: %p\n", $i, $arg0->adapter->sge.txq + $arg0->first_txq + $i
+	set $i = $i + 1
+    end
+end
+
+define queues
+    fe_cxgbe queues_helper
 end

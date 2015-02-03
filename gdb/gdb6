@@ -1828,15 +1828,16 @@ document lsdev
 Show new-bus devices.
 end
 
-# Show the new-bus device tree
-define devinfo
+# Invoke a function (arg0) on each device_t node in a depth-first walk
+# passing it an additional arg (arg1) as well as a pointer to the
+# device and a depth
+define devwalk
     set $indent = 0
     set $dev = root_bus
     set $ignore = 0
     while ($dev != 0)
-	if ($dev->nameunit != 0 && $ignore == 0)
-	    spaces $indent
-	    printf "%s %p (%p)\n", $dev->nameunit, $dev, $dev->softc
+	if ($ignore == 0)
+	    $arg0 $arg1 $dev $indent
 	end
 	if ($dev->children.tqh_first != 0 && $ignore == 0)
 	    set $dev = $dev->children.tqh_first
@@ -1853,6 +1854,22 @@ define devinfo
 	    end
 	end
     end
+end
+
+document devwalk
+Walk the new-bus hierarchy depth-first invoking a callback on each device.
+end
+
+# Show the new-bus device tree
+define devinfo_helper
+    if ($arg1->nameunit != 0)
+	spaces $arg2
+	printf "%s %p (%p)\n", $arg1->nameunit, $arg1, $arg1->softc
+    end
+end
+
+define devinfo
+    devwalk devinfo_helper 0
 end
 
 document devinfo
