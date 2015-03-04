@@ -310,3 +310,8 @@ end
 define queues
     fe_cxgbe queues_helper
 end
+
+define toesock
+    tcpsock $arg0
+    set $toe = (struct toepcb *)$tp->t_toe
+end

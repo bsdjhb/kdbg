@@ -3934,3 +3934,13 @@ end
 document ktrdump
 Display KTR trace buffer.
 end
+
+define tcpsock
+   set $so = (struct socket *)$arg0
+   set $inp = (struct inpcb *)$so->so_pcb
+   set $tp = (struct tcpcb *)$inp->inp_ppcb
+end
+
+document tcpsock
+Set variables for TCP socket structures.
+end
