@@ -313,5 +313,5 @@ end
 
 define toesock
     tcpsock $arg0
-    set $toe = (struct toepcb *)$tp->t_toe
+    set $toep = (struct toepcb *)$tp->t_toe
 end
