@@ -3991,7 +3991,7 @@ define lspmc_cpu
 	    set $_p = (struct pcpu *)cpu0prvpage
 	end
 	if (pmc_pcpu[$_p->pc_cpuid] != 0)
-	    pmc_cpu pmc_pcpu[$_p->pc_cpuid], $_p->pc_cpuid
+	    pmc_cpu pmc_pcpu[$_p->pc_cpuid] $_p->pc_cpuid
 	end
 	pcpu_next $_p
     end
