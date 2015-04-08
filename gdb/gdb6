@@ -3936,11 +3936,35 @@ Display KTR trace buffer.
 end
 
 define tcpsock
-   set $so = (struct socket *)$arg0
-   set $inp = (struct inpcb *)$so->so_pcb
-   set $tp = (struct tcpcb *)$inp->inp_ppcb
+    set $so = (struct socket *)$arg0
+    set $inp = (struct inpcb *)$so->so_pcb
+    set $tp = (struct tcpcb *)$inp->inp_ppcb
 end
 
 document tcpsock
 Set variables for TCP socket structures.
+end
+
+define pmc_proc
+    printf "Active PMCs for %s (pid %d):\n", $arg0->pp_proc->p_comm, \
+        $arg0->pp_proc->p_pid
+    set $_j = 0
+    while ($_j < md->pmd_npmc)
+        if ($arg0->pp_pmcs[$_j].pp_pmc != 0)
+	    printf " [%2d]: %p\n", $_j, $arg0->pp_pmcs[$_j].pp_pmc
+	end
+        set $_j = $_j + 1
+    end
+end
+
+define lspmc
+    set $_i = 0
+    while ($_i < pmc_hashsize)
+        set $_pp = pmc_processhash[$_i].lh_first
+	while ($_pp != 0)
+	    pmc_proc $_pp
+	    set $_pp = $_pp->pp_next.le_next
+	end
+        set $_i = $_i + 1
+    end
 end
