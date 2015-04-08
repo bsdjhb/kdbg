@@ -3957,7 +3957,7 @@ define pmc_proc
     end
 end
 
-define lspmc
+define lspmc_proc
     set $_i = 0
     while ($_i < pmc_hashsize)
         set $_pp = pmc_processhash[$_i].lh_first
@@ -3967,4 +3967,39 @@ define lspmc
 	end
         set $_i = $_i + 1
     end
+end
+
+document lspmc_proc
+Display PMCs configured by process.
+end
+
+set $PMC_PCPU_CPU_MASK = 0x000000FF
+
+define pmc_cpu
+    printf "Active PMCs on CPU %d:\n", $arg0->pc_state & $PMC_PCPU_CPU_MASK
+    set $_j = 0
+    while ($_j < md->pmd_npmc)
+        if ($arg0->pc_hwpmcs[$_j].phw_pmc != 0)
+	    printf " [%2d]: %p\n", $_j, $arg0->pc_hwpmcs[$_j].phw_pmc
+	end
+        set $_j = $_j + 1
+    end    
+end
+
+define lspmc_cpu
+    pcpu_first $_p
+    while ($_p != 0)
+	if ($__i386__ && $p == 0xffc00000 || $p == 0xffe00000)
+	    set $_p = (struct pcpu *)cpu0prvpage
+	end
+	if (pmc_pcpu[$_p->pc_cpuid] != 0)
+	    pmc_cpu pmc_pcpu[$_p->pc_cpuid]
+	end
+	pcpu_next $_p
+    end
+    
+end
+
+document lspmc_cpu
+Display active PMCs on each CPU.
 end
