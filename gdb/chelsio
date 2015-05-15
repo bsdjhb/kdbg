@@ -315,3 +315,17 @@ define toesock
     tcpsock $arg0
     set $toep = (struct toepcb *)$tp->t_toe
 end
+
+define vis_helper
+    printf "%s: pi %p\n", $arg0->dev->nameunit, $arg0
+    set $i = 0
+    while ($i < $pi->nvi)
+        set $vi = $pi->vi[$i]
+	printf" [%d]: %s: %p\n", $i, $vi->dev->nameunit, $vi
+	set $i = $i + 1
+    end
+end
+
+define vis
+    fe_cxgbe vis_helper
+end
