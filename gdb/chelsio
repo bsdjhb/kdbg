@@ -329,3 +329,14 @@ end
 define vis
     fe_cxgbe vis_helper
 end
+
+define td_helper
+    if $arg0->adapter->port[0] == $arg0
+	printf "%s: td %p\n", $arg0->adapter->dev->nameunit, \
+	    $arg0->adapter->tom_softc
+    end
+end
+
+define toedevs
+    fe_cxgbe td_helper
+end
