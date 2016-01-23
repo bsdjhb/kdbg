@@ -32,4 +32,5 @@ The dtrace/ subdirectory holds various DTrace scripts.
 Filename | Description
 --- | ---
 eperm.d | Determine the source of an `EPERM` error from `stat()`
+vfsfilt.d | Trace `EVFILT_VNODE` event activations
 
