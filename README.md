@@ -3,6 +3,8 @@ FreeBSD kernel debugging scripts
 
 This simple repository holds things I find useful for kernel debugging on FreeBSD.
 
+## gdb/
+
 The gdb/ subdirectory holds a set of scripts useful with the kgdb front-end to gdb.  To use these scripts, do the following in kgdb:
 
 ```
@@ -22,4 +24,12 @@ gdb4 | General commands for use with FreeBSD 4.x
 gdb6 | General commands for use with FreeBSD 6.x and later
 gdb6.amd64 | amd64-specific commands for gdb6.  Included automatically by gdb6 on amd64 kernels.
 gdb6.i386 | i386-specific commands for gdb6.  Included automatically by gdb6 on i386 kernels.
+
+## dtrace/
+
+The dtrace/ subdirectory holds various DTrace scripts.
+
+Filename | Description
+--- | ---
+eperm.d | Determine the source of an `EPERM` error from `stat()`
 
