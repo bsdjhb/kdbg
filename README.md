@@ -34,5 +34,6 @@ Filename | Description
 eperm.d | Determine the source of an `EPERM` error from `stat()`
 g_media.d | Trace source of ZFS `SPA_PROBE` requests.
 ipmi_req.d | Trace ioctl requests to `/dev/ipmi0`
+rendezvous.d | Generate stats of SMP rendezvous.
 vfsfilt.d | Trace `EVFILT_VNODE` event activations
 
