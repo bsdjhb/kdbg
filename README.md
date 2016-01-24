@@ -35,6 +35,6 @@ eperm.d | Determine the source of an `EPERM` error from `stat()`
 g_media.d | Trace source of ZFS `SPA_PROBE` requests.
 ipmi_req.d | Trace ioctl requests to `/dev/ipmi0`
 rendezvous.d | Generate stats of SMP rendezvous.
+set_regs_diff.py | Output the registers actually changed by each `PT_SETREGS` `ptrace(2)` operation
 syscalls.d | Simple system call histogram.
 vfsfilt.d | Trace `EVFILT_VNODE` event activations
-
