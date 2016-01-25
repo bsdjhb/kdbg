@@ -271,7 +271,7 @@ define intrq
     end
 end
 
-define eq
+define eq_buf_ring
     set $_eq = (struct sge_eq *)$arg0
     printf "cntxt_id: %d  qsize: %d  cap:  %d\n", \
         $_eq->cntxt_id, $_eq->qsize, $_eq->cap
@@ -279,6 +279,26 @@ define eq
     bswap16 $_eq->spg->cidx $_cidx
     bswap16 $_eq->spg->pidx $_pidx
     printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
+end
+
+define eq_mp_ring
+    set $_eq = (struct sge_eq *)$arg0
+    set $_eq_spg = (struct sge_qstat *)&$_eq->desc[$_eq->sidx]
+    printf "cntxt_id: %d  sidx:  %d  cidx: %d  pidx: %d\n", \
+        $_eq->cntxt_id, $_eq->sidx, $_eq->cidx, $_eq->pidx
+    bswap32 $_eq_spg->qid $_qid
+    bswap16 $_eq_pg->cidx $_cidx
+    bswap16 $_eq_pg->pidx $_pidx
+    printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
+end
+
+define eq
+    # XXX: Not a perfect test
+    if (osreldate >= 1100052 || (osreldate < 1100000 && osreldate >= 1001518))
+        eq_mp_ring $arg0
+    else
+        eq_buf_ring $arg0
+    end
 end
 
 define iq
