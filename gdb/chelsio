@@ -271,6 +271,98 @@ define intrq
     end
 end
 
+set $S_FW_WR_OP = 24
+set $M_FW_WR_OP = 0xff
+
+set $S_FW_WR_IMMDLEN = 0
+set $M_FW_WR_IMMDLEN = 0xff
+
+set $S_FW_WR_LEN16 = 0
+set $M_FW_WR_LEN16 = 0xff
+
+set $FW_ETH_TX_PKT_WR = 0x08
+
+set $S_CPL_OPCODE = 24
+
+set $CPL_TX_PKT = 0xe
+set $CPL_TX_PKT_LSO = 0xed
+
+set $S_ULPTX_NSGE = 0
+set $M_ULPTX_NSGE = 0xFFFF
+
+define eq_msg
+    set $_hdr = (uint32_t *)&$arg0->desc[$arg1]
+    bswap32 $_hdr[0] $_op_immdlen
+    bswap32 $_hdr[1] $_equiq_to_len16
+    set $_wr_op = ($_op_immdlen >> $S_FW_WR_OP) & $M_FW_WR_OP
+    set $_len16 = ($_equiq_to_len16 >> $S_FW_WR_LEN16) & $M_FW_WR_LEN16
+    printf "[%2d]: fw op %#x len16 %d",  $arg1, $_wr_op, $_len16
+    if ($_wr_op == $FW_ETH_TX_PKT_WR)
+        set $_wr = (struct fw_eth_tx_pkt_wr *)$_hdr
+        set $_hdr = (uint32_t *)($_wr + 1)
+        bswap32 $_hdr[0] $_cpl_op
+	set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
+	printf " CPL %#x", $_cpl_op
+	if ($_cpl_op == $CPL_TX_PKT_LSO)
+	    printf " LSO"
+	    set $_lso = (struct cpl_tx_pkt_lso_core *)$_hdr
+	    set $_hdr = (uint32_t *)($_lso + 1)
+	    bswap32 $_hdr[0] $_cpl_op
+	    set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
+	    printf " CPL %#x", $_cpl_op
+	end
+	if ($_cpl_op == $CPL_TX_PKT)
+	    set $_cpl = (struct cpl_tx_pkt_core *)$_hdr
+	    bswap16 $_cpl->len $_pktlen
+	    printf " TXPKT (pktlen %d)", $_pktlen
+	    set $_immdlen = ($_op_immdlen >> $S_FW_WR_IMMDLEN) & \
+	        $M_FW_WR_IMMDLEN
+	    # Subtract out LSO header if it exists
+	    set $_immdlen = $_immdlen - \
+	        ((uintptr_t)$_hdr - (uintptr_t)($_wr + 1))
+	    set $_immdlen = $_immdlen - sizeof(struct cpl_tx_pkt_core)
+	    if ($_immdlen > 0)
+	        printf " immediate"
+	    else
+	        set $_usgl = (struct ulptx_sgl *)($_cpl + 1)
+		bswap32 $_usgl->cmd_nsge $_cmd_nsge
+		set $_nsegs = ($_cmd_nsge >> $S_ULPTX_NSGE) & $M_ULPTX_NSGE
+		set $_seg_idx = 1
+		bswap64 $_usgl->addr0 $_sgaddr
+		bswap32 $_usgl->len0 $_sglen
+		printf "\n  [0]: %#llx : %#x", $_sgaddr, $_sglen
+		set $_segs = $_usgl->sge
+		while ($_seg_idx < $_nsegs)
+		    bswap64 $_segs->addr[0] $_sgaddr
+		    bswap32 $_segs->len[0] $_sglen
+		    printf "\n  [%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
+		    bswap64 $_segs->addr[1] $_sgaddr
+		    bswap32 $_segs->len[1] $_sglen
+		    printf "\n  [%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, \
+		        $_sglen
+		    set $_seg_idx = $_seg_idx + 2
+		    set $_segs = $_segs + 1
+		end
+	    end
+	end
+    end
+    printf "\n"
+end
+
+# <eq> <start> <count>
+define eq_msgs
+    set $_idx = $arg1
+    set $_count = $arg2
+    while ($_count-- > 0)
+        eq_msg $arg0 $_idx
+	if ($_len16 == 0)
+	    set $_idx = $_idx + 1
+	else
+	    set $_idx = $_idx + ($_len16 + 3) / 4
+	end
+    end
+end
+
 define eq_buf_ring
     set $_eq = (struct sge_eq *)$arg0
     printf "cntxt_id: %d  qsize: %d  cap:  %d\n", \
@@ -284,8 +376,8 @@ end
 define eq_mp_ring
     set $_eq = (struct sge_eq *)$arg0
     set $_eq_spg = (struct sge_qstat *)&$_eq->desc[$_eq->sidx]
-    printf "cntxt_id: %d  sidx:  %d  cidx: %d  pidx: %d\n", \
-        $_eq->cntxt_id, $_eq->sidx, $_eq->cidx, $_eq->pidx
+    printf "cntxt_id: %d  sidx:  %d  cidx: %d  pidx: %d  dbidx: %d\n", \
+        $_eq->cntxt_id, $_eq->sidx, $_eq->cidx, $_eq->pidx, $_eq->dbidx
     bswap32 $_eq_spg->qid $_qid
     bswap16 $_eq_spg->cidx $_cidx
     bswap16 $_eq_spg->pidx $_pidx

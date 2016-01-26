@@ -2400,6 +2400,14 @@ define bswap32
         ($_local << 8 & 0xff0000) | ($_local << 24 & 0xff000000)
 end
 
+define bswap64
+    set $_lo32 = $arg0 & 0xffffffff
+    set $_hi32 = ($arg0 >> 32) & 0xffffffff
+    bswap32 $_lo32 $_lo32s
+    bswap32 $_hi32 $_hi32s
+    set $arg1 = ((uint64_t)$_hi32s << 32) | $_lo32s
+end
+
 define print_ether_addr
     set $_cp = (unsigned char *)$arg0
     set $_i = 0
