@@ -235,9 +235,11 @@ set $X_RSPD_TYPE_FLBUF = 0
 set $X_RSPD_TYPE_CPL = 1
 set $X_RSPD_TYPE_INTR = 2
 
+set $IQ_ESIZE = 64
+
 define iq_msg
-    set $_offset = (char *)$arg0->desc + ($arg1 * $arg0->esize)
-    set $_ctrl = (struct rsp_ctrl *)($_offset + ($arg0->esize - sizeof(struct rsp_ctrl)))
+    set $_offset = (char *)$arg0->desc + ($arg1 * $IQ_ESIZE)
+    set $_ctrl = (struct rsp_ctrl *)($_offset + ($IQ_ESIZE - sizeof(struct rsp_ctrl)))
     set $_rspd_type = ($_ctrl->u.type_gen >> $S_RSPD_TYPE) & $M_RSPD_TYPE
     set $_rss = (struct rss_header *)$_offset
     set $_cpl = (struct cpl_rx_pkt *)($_rss + 1)
@@ -397,7 +399,7 @@ define iq
     set $_iq = (struct sge_iq *)$arg0
     printf "cntxt_id: %d  qsize: %d\n", \
         $_iq->cntxt_id, $_iq->qsize
-    set $_offset = (char *)$_iq->desc + (($_iq->qsize - 1) * $_iq->esize)
+    set $_offset = (char *)$_iq->desc + (($_iq->qsize - 1) * $IQ_ESIZE)
     set $_iq_spg = (struct sge_qstat *)$_offset
     bswap32 $_iq_spg->qid $_qid
     bswap16 $_iq_spg->cidx $_cidx
