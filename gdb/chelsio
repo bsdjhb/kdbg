@@ -235,6 +235,7 @@ set $X_RSPD_TYPE_FLBUF = 0
 set $X_RSPD_TYPE_CPL = 1
 set $X_RSPD_TYPE_INTR = 2
 
+set $CPL_RX_DATA = 0x39
 set $CPL_RX_PKT = 0x3B
 set $CPL_RX_DATA_DDP = 0x42
 
@@ -249,15 +250,25 @@ define cpl
     bswap32 $_ot->opcode_tid $_tid
     set $_tid = $_tid & 0xFFFFFF
     printf " CPL %02x", $arg0->opcode
-    if ($arg0->opcode == $CPL_RX_PKT)
+    if ($_ot->opcode == $CPL_RX_DATA)
+        set $_cpl = (struct cpl_rx_data *)$_ot
+	bswap16 $_cpl->len $_len
+	printf " (RX_DATA) tid %d len %d", $_tid, $_len
+	if ($_cpl->ddp_off)
+	    printf " DDP off"
+	else
+	    printf " DDP on"
+	end
+    end
+    if ($_ot->opcode == $CPL_RX_PKT)
         set $_cpl = (struct cpl_rx_pkt *)$_ot
 	printf " (RX_PKT)"
         if ($_cpl->vlan_ex)
              bswap16 $_cpl->vlan $_vlan
-	     printf " vlan: %d", $_vlan
+	     printf " vlan %d", $_vlan
         end	
     end
-    if ($arg0->opcode == $CPL_RX_DATA_DDP)
+    if ($_ot->opcode == $CPL_RX_DATA_DDP)
         set $_cpl = (struct cpl_rx_data_ddp *)$_ot
 	printf " (RX_DATA_DDP) tid %d", $_tid
 	bswap32 $_cpl->ddpvld $_vld
@@ -265,8 +276,8 @@ define cpl
 	    printf " invalid (%x)", $_vld
 	else
 	    bswap32 $_cpl->u.ddp_report $_report
-	    bswap16 $_cpl->len $_ddplen
-	    printf " buf %d len %d", $_report & $F_DDP_BUF_IDX ? 1 : 0, $_ddplen
+	    bswap16 $_cpl->len $_len
+	    printf " buf %d len %d", $_report & $F_DDP_BUF_IDX ? 1 : 0, $_len
 	end
     end
 end
