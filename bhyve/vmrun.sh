@@ -46,7 +46,7 @@ errmsg() {
 usage() {
 	local msg=$1
 
-	echo "Usage: vmrun.sh [-ahi] [-c <CPUs>] [-C <console>] [-d <disk file>]"
+	echo "Usage: vmrun.sh [-ahiw] [-c <CPUs>] [-C <console>] [-d <disk file>]"
 	echo "                [-e <name=value>] [-g <gdbport> ] [-H <directory>]"
 	echo "                [-I <location of installation iso>] [-l <loader>]"
 	echo "                [-m <memsize>] [-t <tapdev>] <vmname>"
@@ -65,6 +65,7 @@ usage() {
 	echo "       -m: memory size (default is ${DEFAULT_MEMSIZE})"
 	echo "       -p: pass-through a host PCI device at bus/slot/func (e.g. 10/0/0)"
 	echo "       -t: tap device for virtio-net (default is $DEFAULT_TAPDEV)"
+	echo "       -w: ignore accesses to unimplemented MSRs"
 	echo ""
 	[ -n "$msg" ] && errmsg "$msg"
 	exit 1
@@ -93,7 +94,7 @@ loader_opt=""
 bhyverun_opt="-H -A -P"
 pass_total=0
 
-while getopts ac:C:d:e:g:hH:iI:l:m:p:t: c ; do
+while getopts ac:C:d:e:g:hH:iI:l:m:p:t:w c ; do
 	case $c in
 	a)
 		bhyverun_opt="${bhyverun_opt} -a"
@@ -139,6 +140,9 @@ while getopts ac:C:d:e:g:hH:iI:l:m:p:t: c ; do
 	t)
 		eval "tap_dev${tap_total}=\"${OPTARG}\""
 		tap_total=$(($tap_total + 1))
+		;;
+	w)
+		bhyverun_opt="${bhyverun_opt} -w"
 		;;
 	*)
 		usage
