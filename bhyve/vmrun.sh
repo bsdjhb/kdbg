@@ -258,7 +258,7 @@ while [ 1 ]; do
 	fi
 
 	if [ -n "$use_grub" ]; then
-		${GRUB} -c ${console} -M ${memsize} -m ${device_map} \
+		${GRUB} -M ${memsize} -m ${device_map} \
 			${loader_opt} ${vmname}
 		rm ${device_map}
 		device_map=
