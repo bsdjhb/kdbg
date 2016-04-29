@@ -248,12 +248,14 @@ while [ 1 ]; do
 			if [ -r ${disk} ] ; then
 				BOOTDISKS="$BOOTDISKS -d ${disk} "
 				if [ -n "$device_map" ]; then
-					echo "(hd${i}) ${isofile}" >> \
-					    ${device_map}
+					echo "(hd${i}) ${disk}" >> ${device_map}
 				fi
 			fi
 			i=$(($i + 1))
 		done
+		if [ -n "$device_map" ]; then
+			loader_opt="${loader_opt} -r hd0,msdos1"
+		fi
 		installer_opt=""
 	fi
 
