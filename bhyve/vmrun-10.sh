@@ -263,7 +263,13 @@ while [ 1 ]; do
 	    i=$(($i + 1))
         done
 
-	${FBSDRUN} -c ${cpus} -m ${memsize} ${apic_opt} -A -H -P	\
+	if kldstat -qm nmdm; then
+	    devargs="$devargs -l com2,/dev/nmdm${vmname}2B "
+	fi
+	devargs="$devargs -s $nextslot:0,virtio-rnd "
+	nextslot=$(($nextslot + 1))
+
+	${FBSDRUN} -b -c ${cpus} -m ${memsize} ${apic_opt} -A -H -P	\
 		-g ${gdbport}						\
 		-s 0:0,hostbridge					\
 		-s 1:0,lpc						\
