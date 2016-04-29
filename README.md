@@ -38,3 +38,7 @@ rendezvous.d | Generate stats of SMP rendezvous.
 set_regs_diff.py | Output the registers actually changed by each `PT_SETREGS` `ptrace(2)` operation
 syscalls.d | Simple system call histogram.
 vfsfilt.d | Trace `EVFILT_VNODE` event activations
+
+## bhyve/
+
+The bhyve/ subdirectory holds various variants of vmrun.sh.
