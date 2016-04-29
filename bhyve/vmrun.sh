@@ -27,6 +27,7 @@
 # $FreeBSD: head/share/examples/bhyve/vmrun.sh 289001 2015-10-08 02:28:22Z marcel $
 #
 
+GRUB=/usr/local/sbin/grub-bhyve
 LOADER=/usr/sbin/bhyveload
 BHYVECTL=/usr/sbin/bhyvectl
 FBSDRUN=/usr/sbin/bhyve
@@ -46,7 +47,7 @@ errmsg() {
 usage() {
 	local msg=$1
 
-	echo "Usage: vmrun.sh [-ahiw] [-c <CPUs>] [-C <console>] [-d <disk file>]"
+	echo "Usage: vmrun.sh [-aGhiw] [-c <CPUs>] [-C <console>] [-d <disk file>]"
 	echo "                [-e <name=value>] [-g <gdbport> ] [-H <directory>]"
 	echo "                [-I <location of installation iso>] [-l <loader>]"
 	echo "                [-m <memsize>] [-t <tapdev>] <vmname>"
@@ -58,6 +59,7 @@ usage() {
 	echo "       -d: virtio diskdev file (default is ${DEFAULT_VIRTIO_DISK})"
 	echo "       -e: set FreeBSD loader environment variable"
 	echo "       -g: listen for connection from kgdb at <gdbport>"
+	echo "       -G: use grub-bhyve"
 	echo "       -H: host filesystem to export to the loader"
 	echo "       -i: force boot of the Installation CDROM image"
 	echo "       -I: Installation CDROM image location (default is ${DEFAULT_ISOFILE})"
@@ -93,8 +95,9 @@ gdbport=0
 loader_opt=""
 bhyverun_opt="-H -A -P"
 pass_total=0
+use_grub=
 
-while getopts ac:C:d:e:g:hH:iI:l:m:p:t:w c ; do
+while getopts ac:C:d:e:g:GhH:iI:l:m:p:t:w c ; do
 	case $c in
 	a)
 		bhyverun_opt="${bhyverun_opt} -a"
@@ -117,6 +120,9 @@ while getopts ac:C:d:e:g:hH:iI:l:m:p:t:w c ; do
 		;;
 	g)	
 		gdbport=${OPTARG}
+		;;
+	G)
+		use_grub=1
 		;;
 	H)
 		host_base=`realpath ${OPTARG}`
@@ -206,6 +212,10 @@ ${BHYVECTL} --vm=${vmname} --destroy > /dev/null 2>&1
 
 while [ 1 ]; do
 
+	if [ -n "$use_grub" ]; then
+		device_map=`mktemp -t grub-bhyve` || exit 1
+	fi
+
 	file -s ${first_diskdev} | grep "boot sector" > /dev/null
 	rc=$?
 	if [ $rc -ne 0 ]; then
@@ -226,6 +236,10 @@ while [ 1 ]; do
 		fi
 		BOOTDISKS="-d ${isofile}"
 		installer_opt="-s 31:0,ahci-cd,${isofile}"
+		if [ -n "$device_map" ]; then
+			echo "(cd0) ${isofile}" >> ${device_map}
+			loader_opt="${loader_opt} -r cd0"
+		fi
 	else
 		BOOTDISKS=""
 		i=0
@@ -233,14 +247,25 @@ while [ 1 ]; do
 			eval "disk=\$disk_dev${i}"
 			if [ -r ${disk} ] ; then
 				BOOTDISKS="$BOOTDISKS -d ${disk} "
+				if [ -n "$device_map" ]; then
+					echo "(hd${i}) ${isofile}" >> \
+					    ${device_map}
+				fi
 			fi
 			i=$(($i + 1))
 		done
 		installer_opt=""
 	fi
 
-	${LOADER} -c ${console} -m ${memsize} ${BOOTDISKS} ${loader_opt} \
-		${vmname}
+	if [ -n "$use_grub" ]; then
+		${GRUB} -c ${console} -M ${memsize} -m ${device_map} \
+			${loader_opt} ${vmname}
+		rm ${device_map}
+		device_map=
+	else
+		${LOADER} -c ${console} -m ${memsize} ${BOOTDISKS} \
+			  ${loader_opt} ${vmname}
+	fi
 	bhyve_exit=$?
 	if [ $bhyve_exit -ne 0 ]; then
 		break
