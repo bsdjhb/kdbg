@@ -273,6 +273,12 @@ while [ 1 ]; do
 	    i=$(($i + 1))
         done
 
+	if kldstat -qm nmdm; then
+	    devargs="$devargs -l com2,/dev/nmdm${vmname}2B "
+	fi
+	devargs="$devargs -s $nextslot:0,virtio-rnd "
+	nextslot=$(($nextslot + 1))
+
 	${FBSDRUN} -c ${cpus} -m ${memsize} ${bhyverun_opt}		\
 		-g ${gdbport}						\
 		-s 0:0,hostbridge					\
