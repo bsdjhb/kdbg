@@ -260,6 +260,9 @@ while [ 1 ]; do
 	fi
 
 	if [ -n "$use_grub" ]; then
+		if [ "${console}" != "stdio" ]; then
+			loader_opt="${loader_opt} -c ${console}"
+		fi
 		${GRUB} -M ${memsize} -m ${device_map} \
 			${loader_opt} ${vmname}
 		rm ${device_map}
