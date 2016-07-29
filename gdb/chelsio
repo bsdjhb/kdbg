@@ -341,14 +341,66 @@ set $S_FW_WR_LEN16 = 0
 set $M_FW_WR_LEN16 = 0xff
 
 set $FW_ETH_TX_PKT_WR = 0x08
+set $FW_ETH_TX_PKT_VM_WR = 0x11
 
 set $S_CPL_OPCODE = 24
 
 set $CPL_TX_PKT = 0xe
 set $CPL_TX_PKT_LSO = 0xed
+set $CPL_TX_PKT_XT = 0xee
 
 set $S_ULPTX_NSGE = 0
 set $M_ULPTX_NSGE = 0xFFFF
+
+define cpl_msg
+    set $_hdr = (uint32_t *)($_wr + 1)
+    bswap32 $_hdr[0] $_cpl_op
+    set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
+    printf " CPL %#x", $_cpl_op
+    if ($_cpl_op == $CPL_TX_PKT_LSO)
+	printf " LSO"
+	set $_lso = (struct cpl_tx_pkt_lso_core *)$_hdr
+	set $_hdr = (uint32_t *)($_lso + 1)
+	bswap32 $_hdr[0] $_cpl_op
+	set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
+	printf " CPL %#x", $_cpl_op
+    end
+    if ($_cpl_op == $CPL_TX_PKT || $_cpl_op == $CPL_TX_PKT_XT)
+	set $_cpl = (struct cpl_tx_pkt_core *)$_hdr
+	bswap16 $_cpl->len $_pktlen
+	if ($_cpl_op == $CPL_TX_PKT)
+	    printf " TXPKT (pktlen %d)", $_pktlen
+	else
+	    printf " TXPKT_XT (pktlen %d)", $_pktlen
+	end
+	set $_immdlen = ($_op_immdlen >> $S_FW_WR_IMMDLEN) & $M_FW_WR_IMMDLEN
+	# Subtract out LSO header if it exists
+	set $_immdlen = $_immdlen - ((uintptr_t)$_hdr - (uintptr_t)($_wr + 1))
+	set $_immdlen = $_immdlen - sizeof(struct cpl_tx_pkt_core)
+	if ($_immdlen > 0)
+	    printf " immediate"
+	else
+	    set $_usgl = (struct ulptx_sgl *)($_cpl + 1)
+	    bswap32 $_usgl->cmd_nsge $_cmd_nsge
+	    set $_nsegs = ($_cmd_nsge >> $S_ULPTX_NSGE) & $M_ULPTX_NSGE
+	    set $_seg_idx = 1
+	    bswap64 $_usgl->addr0 $_sgaddr
+	    bswap32 $_usgl->len0 $_sglen
+	    printf "\n	[0]: %#llx : %#x", $_sgaddr, $_sglen
+	    set $_segs = $_usgl->sge
+	    while ($_seg_idx < $_nsegs)
+		bswap64 $_segs->addr[0] $_sgaddr
+		bswap32 $_segs->len[0] $_sglen
+		printf "\n  [%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
+		bswap64 $_segs->addr[1] $_sgaddr
+		bswap32 $_segs->len[1] $_sglen
+		printf "\n  [%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, $_sglen
+		set $_seg_idx = $_seg_idx + 2
+		set $_segs = $_segs + 1
+	    end
+	end
+    end
+end
 
 define eq_msg
     set $_hdr = (uint32_t *)&$arg0->desc[$arg1]
@@ -359,52 +411,11 @@ define eq_msg
     printf "[%2d]: fw op %#x len16 %d",  $arg1, $_wr_op, $_len16
     if ($_wr_op == $FW_ETH_TX_PKT_WR)
         set $_wr = (struct fw_eth_tx_pkt_wr *)$_hdr
-        set $_hdr = (uint32_t *)($_wr + 1)
-        bswap32 $_hdr[0] $_cpl_op
-	set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
-	printf " CPL %#x", $_cpl_op
-	if ($_cpl_op == $CPL_TX_PKT_LSO)
-	    printf " LSO"
-	    set $_lso = (struct cpl_tx_pkt_lso_core *)$_hdr
-	    set $_hdr = (uint32_t *)($_lso + 1)
-	    bswap32 $_hdr[0] $_cpl_op
-	    set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
-	    printf " CPL %#x", $_cpl_op
-	end
-	if ($_cpl_op == $CPL_TX_PKT)
-	    set $_cpl = (struct cpl_tx_pkt_core *)$_hdr
-	    bswap16 $_cpl->len $_pktlen
-	    printf " TXPKT (pktlen %d)", $_pktlen
-	    set $_immdlen = ($_op_immdlen >> $S_FW_WR_IMMDLEN) & \
-	        $M_FW_WR_IMMDLEN
-	    # Subtract out LSO header if it exists
-	    set $_immdlen = $_immdlen - \
-	        ((uintptr_t)$_hdr - (uintptr_t)($_wr + 1))
-	    set $_immdlen = $_immdlen - sizeof(struct cpl_tx_pkt_core)
-	    if ($_immdlen > 0)
-	        printf " immediate"
-	    else
-	        set $_usgl = (struct ulptx_sgl *)($_cpl + 1)
-		bswap32 $_usgl->cmd_nsge $_cmd_nsge
-		set $_nsegs = ($_cmd_nsge >> $S_ULPTX_NSGE) & $M_ULPTX_NSGE
-		set $_seg_idx = 1
-		bswap64 $_usgl->addr0 $_sgaddr
-		bswap32 $_usgl->len0 $_sglen
-		printf "\n  [0]: %#llx : %#x", $_sgaddr, $_sglen
-		set $_segs = $_usgl->sge
-		while ($_seg_idx < $_nsegs)
-		    bswap64 $_segs->addr[0] $_sgaddr
-		    bswap32 $_segs->len[0] $_sglen
-		    printf "\n  [%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
-		    bswap64 $_segs->addr[1] $_sgaddr
-		    bswap32 $_segs->len[1] $_sglen
-		    printf "\n  [%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, \
-		        $_sglen
-		    set $_seg_idx = $_seg_idx + 2
-		    set $_segs = $_segs + 1
-		end
-	    end
-	end
+	cpl_msg
+    end
+    if ($_wr_op == $FW_ETH_TX_PKT_VM_WR)
+        set $_wr = (struct fw_eth_tx_pkt_vm_wr *)$_hdr
+        cpl_msg
     end
     printf "\n"
 end
