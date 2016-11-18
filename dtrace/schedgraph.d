@@ -95,7 +95,7 @@ callout_execute:::callout-start
 
 callout_execute:::callout-end
 {
-	printf("%d %d KTRGRAPH group:\"callout\", id:\"callout %s\", state:\"idle\"\n", cpu, timestamp, curthread->td_name, attributes: \"none\");
+	printf("%d %d KTRGRAPH group:\"callout\", id:\"callout %s\", state:\"idle\", attributes: \"none\"\n", cpu, timestamp, curthread->td_name);
 }
 
 tick-5s
