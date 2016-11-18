@@ -88,6 +88,16 @@ sched:::on-cpu
 	printf("%d %d KTRGRAPH group:\"thread\", id:\"%s/%s tid %d\", state:\"running\", attributes: prio:%d\n", cpu, timestamp, curthread->td_proc->p_comm, curthread->td_name, curthread->td_tid, curthread->td_priority);
 }
 
+callout_execute:::callout-start
+{
+	printf("%d %d KTRGRAPH group:\"callout\", id:\"%s\", state:\"running\", attributes: func:%a, arg:%p\n", cpu, timestamp, curthread->td_name, args[0]->c_func, args->c_arg);
+}
+
+callout_execute:::callout-end
+{
+	printf("%d %d KTRGRAPH group:\"callout\", id:\"%s\", state:\"idle\"\n", cpu, timestamp, curthread->td_name);
+}
+
 tick-5s
 {
 	exit(0);
