@@ -1,0 +1,4 @@
+#!/bin/sh
+
+sort -k 2nrb $1 | cat -n > $2
+
