@@ -90,12 +90,12 @@ sched:::on-cpu
 
 callout_execute:::callout-start
 {
-	printf("%d %d KTRGRAPH group:\"callout\", id:\"%s\", state:\"running\", attributes: func:%a, arg:%p\n", cpu, timestamp, curthread->td_name, args[0]->c_func, args[0]->c_arg);
+	printf("%d %d KTRGRAPH group:\"callout\", id:\"callout %s\", state:\"running\", attributes: func:%a, arg:%p\n", cpu, timestamp, curthread->td_name, args[0]->c_func, args[0]->c_arg);
 }
 
 callout_execute:::callout-end
 {
-	printf("%d %d KTRGRAPH group:\"callout\", id:\"%s\", state:\"idle\"\n", cpu, timestamp, curthread->td_name);
+	printf("%d %d KTRGRAPH group:\"callout\", id:\"callout %s\", state:\"idle\"\n", cpu, timestamp, curthread->td_name, attributes: \"none\");
 }
 
 tick-5s
