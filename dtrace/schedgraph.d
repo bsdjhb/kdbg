@@ -72,13 +72,13 @@ sched:::tick
 }
 
 sched:::off-cpu
-/ args[0]->td_flags & TDF_IDLETD /
+/ curthread->td_flags & TDF_IDLETD /
 {
 	printf("%d %d KTRGRAPH group:\"thread\", id:\"%s/%s tid %d\", state:\"idle\", attributes: prio:%d\n", cpu, timestamp, curthread->td_proc->p_comm, curthread->td_name, curthread->td_tid, curthread->td_priority);
 }
 
 sched:::off-cpu
-/ (args[0]->td_flags & TDF_IDLETD) == 0 /
+/ (curthread->td_flags & TDF_IDLETD) == 0 /
 {
 	printf("%d %d KTRGRAPH group:\"thread\", id:\"%s/%s tid %d\", state:\"%s\", attributes: prio:%d, wmesg:\"%s\", lockname:\"%s\"\n", cpu, timestamp, curthread->td_proc->p_comm, curthread->td_name, curthread->td_tid, KTDSTATE[curthread], curthread->td_priority, curthread->td_wmesg ? stringof(curthread->td_wmesg) : "(null)", curthread->td_lockname ? stringof(curthread->td_lockname) : "(null)");
 }
