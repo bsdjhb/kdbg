@@ -1877,7 +1877,7 @@ Show new-bus heirarchy similar to devinfo(8).
 end
 
 # Pring a single mbuf
-define dumpmbuf
+define dumpmbuf_10
     printf "%p: %d bytes", $arg0, $arg0->m_hdr.mh_len
     if ($arg0->m_hdr.mh_flags & $M_EXT)
 	printf " ext %p", $arg0->M_dat.MH.MH_dat.MH_ext.ext_buf
@@ -1892,12 +1892,51 @@ define dumpmbuf
     printf "\n"
 end
 
+define dumpmbuf_11
+    printf "%p: %d bytes", $arg0, $arg0->m_len
+    if ($arg0->m_flags & $M_EXT)
+	printf " ext %p", $arg0->m_ext.ext_buf
+    end
+    if ($arg0->m_flags & $M_PKTHDR)
+	set $h = $arg0->m_pkthdr
+	printf " packet: %d bytes", $h.len
+	if ($h.rcvif != 0)
+	    printf " received via %s", $h.rcvif->if_xname
+	end
+    end
+    printf "\n"
+end
+
+define dumpmbuf
+    if ($osrelease >= 11)
+	dumpmbuf_11 $arg0
+    else
+	dumpmbuf_10 $arg0
+    end
+end
+
 # Dump an mbuf chain
-define mbuf
+define mbuf_10
     set $m = (struct mbuf *)$arg0
     while ($m != 0)
-	dumpmbuf $m
+	dumpmbuf_10 $m
 	set $m = $m->m_hdr.mh_next
+    end
+end
+
+define mbuf_11
+    set $m = (struct mbuf *)$arg0
+    while ($m != 0)
+	dumpmbuf_11 $m
+	set $m = $m->m_next
+    end
+end
+
+define mbuf
+    if ($osrelease >= 11)
+	mbuf_11 $arg0
+    else
+	mbuf_10 $arg0
     end
 end
 
