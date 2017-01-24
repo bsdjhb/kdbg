@@ -17,6 +17,7 @@ The gdb/ subdirectory holds a set of scripts useful with the kgdb front-end to g
 
 Filename | Description
 --- | ---
+build | Wrapper script to configure and build gdb from git using the same setup as the devel/gdb port.
 chelsio | Commands for use with the cxgb(4) and cxgbe(4) drivers (Chelsio T3/T4/T5 NICs).  Requires gdb6.
 dot.gdbinit.kernel | Older scripts from the main source tree.  My plan is to eventually move useful scripts out of here to gdb6 and remove this.
 dot.gdbinit.paths | See above.

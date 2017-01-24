@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Setup a build env and build gdb similar to how ports builds it
+
+# Figure out some variables
+version=`uname -r | cut -d- -f1`
+arch=`uname -m`
+case $arch in
+	amd64)
+		cfgarch=x86_64
+		obj=obj
+		;;
+	*)
+		cfgarch=${arch}
+		obj=obj.${arch}
+		;;
+esac
+
+datadir=`ls -d /usr/local/share/gdb* 2>/dev/null | head -1`
+if [ -z "$sharedir" ]; then
+    datadir=/usr/local/share/gdb
+fi
+if [ -x /usr/local/bin/python2.7 -a -z "${WITHOUT_PYTHON}" ]; then
+    PYTHON="/usr/local/bin/python2.7"
+    PYTHON_CFG="--with-python=${PYTHON}"
+else
+    PYTHON=""
+    PYTHON_CFG="--without-python"	
+fi
+
+if [ -n "${WITH_GCC}" ]; then
+    CC="${WITH_GCC}"
+    CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
+    WERROR=""
+else
+    CC="cc"
+    CXX="c++"
+    if [ -x /usr/bin/clang -a /usr/bin/clang -ef /usr/bin/cc ]; then
+	# clang-specific warnings to disable
+	EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
+	EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
+    fi
+    WERROR="--disable-werror"
+fi
+
+if [ -n "${WITH_CXX}" ]; then
+    CXX_CFG="--enable-build-with-cxx"
+else
+    CXX_CFG="--disable-build-with-cxx"
+fi
+
+# First, make an obj tree
+mkdir $obj
+
+# Next, run configure
+CONFIGURE_ARGS="--enable-targets=all  --with-gdb-datadir=${datadir}  --with-separate-debug-dir=/usr/lib/debug    --without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui --prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ --build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} --disable-ld --enable-64-bit-bfd ${CXX_CFG}"
+
+(cd $obj; env  CC=${CC} CPP="cpp" CXX=${CXX}  CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing" CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing  -DLIBICONV_PLUG"  LDFLAGS=" -L/usr/local/lib" LIBS=""  INSTALL="/usr/bin/install -c "  INSTALL_DATA="install   -m 0644"  INSTALL_LIB="install    -m 444"  INSTALL_PROGRAM="install    -m 555"  INSTALL_SCRIPT="install   -m 555"  CONFIGURED_M4=m4 CONFIGURED_BISON=byacc  TMPDIR="/tmp" MAKE=gmake PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh CONFIG_SITE=/usr/ports/Templates/config.site lt_cv_sys_max_cmd_len=262144 ../configure ${CONFIGURE_ARGS} )
