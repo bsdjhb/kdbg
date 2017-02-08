@@ -39,8 +39,18 @@ elif [ -n "${XMIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips/rootfs"
-    CC="mips-portbld-freebsd11.0-gcc -nostdinc -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-portbld-freebsd11.0-g++ -nostdinc -nostdinc++ -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.0-gcc -nostdinc -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.0-g++ -nostdinc -nostdinc++ -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV+="gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${XMIPS64}" ]; then
+    obj=obj.mips64
+    version=12.0
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    ROOTFS="/home/john/work/qemu/mips64/rootfs"
+    CC="mips-unknown-freebsd11.0-gcc -static -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.0-g++ -static -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/4.2 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV+="gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${CHERI_MIPS}" ]; then
@@ -79,8 +89,9 @@ CONFIGURE_ARGS="--enable-targets=all  --with-gdb-datadir=${datadir}  --with-sepa
 
 if [ -n "${XMIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
-fi
-if [ -n "${CHERI_MIPS}" ]; then
+elif [ -n "${XMIPS64}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
+elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
 
