@@ -42,28 +42,28 @@ elif [ -n "${XMIPS}" ]; then
     CC="mips-unknown-freebsd11.0-gcc -nostdinc -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     CXX="mips-unknown-freebsd11.0-g++ -nostdinc -nostdinc++ -march=mips32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
-    CONFIGURE_ENV+="gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPS64}" ]; then
     obj=obj.mips64
     version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips64/rootfs"
-    CC="mips-unknown-freebsd11.0-gcc -static -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.0-g++ -static -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/4.2 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.0-gcc -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.0-g++ -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/4.2 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
-    CONFIGURE_ENV+="gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${CHERI_MIPS}" ]; then
-    obj=obj.mips64
+    obj=obj.cheri
     version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
-    CC="/usr/cheri/bin/clang --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -static"
-    CXX="/usr/cheri/bin/clang++ --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -static"
+    CC="/usr/cheri/bin/clang --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float"
+    CXX="/usr/cheri/bin/clang++ --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
     WERROR="--disable-werror"
-    CONFIGURE_ENV+="gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 else
     CC="cc"
     CXX="c++"
