@@ -3741,6 +3741,20 @@ document vmem
 Display the segments in a vmem.
 end
 
+define ktrstat
+    set $i = 0
+    set $ktr = ktr_free.stqh_first
+    while ($ktr != 0)
+	set $i = $i + 1
+	set $ktr = $ktr->ktr_list.stqe_next
+    end
+    printf "Requests: %d free / %d total\n", $i, ktr_requestpool
+end
+
+document ktrstat
+Display stats on ktrace request queue.
+end
+
 define ule_load_7
     set $i = 0
     while ($i <= tdg_maxid)
