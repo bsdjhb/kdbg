@@ -28,6 +28,7 @@ else
     PYTHON_CFG="--without-python"	
 fi
 
+LDFLAGS=
 CONFIGURE_ENV=
 if [ -n "${WITH_GCC}" ]; then
     CC="${WITH_GCC}"
@@ -64,6 +65,17 @@ elif [ -n "${CHERI_MIPS}" ]; then
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${XAARCH64}" ]; then
+    obj=obj.aarch64
+    version=12.0
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    ROOTFS="/mnt"
+    LDFLAGS="-fuse-ld=lld"
+    CC="clang -target aarch64-freebsd12.0 --sysroot=${ROOTFS}"
+    CXX="clang++ -target aarch64-freebsd12.0 --sysroot=${ROOTFS}"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 else
     CC="cc"
     CXX="c++"
@@ -91,8 +103,10 @@ if [ -n "${XMIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
 elif [ -n "${XMIPS64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
+elif [ -n "${XAARCH64}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=aarch64-freebsd --without-expat"
 elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
 
-(cd $obj; env  CC="${CC}" CPP="cpp" CXX="${CXX}"  CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing -std=gnu89" CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing  -DLIBICONV_PLUG"  LDFLAGS=" -L/usr/local/lib" LIBS=""  INSTALL="/usr/bin/install -c "  INSTALL_DATA="install   -m 0644"  INSTALL_LIB="install    -m 444"  INSTALL_PROGRAM="install    -m 555"  INSTALL_SCRIPT="install   -m 555"  CONFIGURED_M4=m4 CONFIGURED_BISON=byacc  TMPDIR="/tmp" MAKE=gmake PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh CONFIG_SITE=/usr/ports/Templates/config.site lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} ../configure ${CONFIGURE_ARGS} )
+(cd $obj; env  CC="${CC}" CPP="cpp" CXX="${CXX}"  CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing -std=gnu89" CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing  -DLIBICONV_PLUG"  LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS=""  INSTALL="/usr/bin/install -c "  INSTALL_DATA="install   -m 0644"  INSTALL_LIB="install    -m 444"  INSTALL_PROGRAM="install    -m 555"  INSTALL_SCRIPT="install   -m 555"  CONFIGURED_M4=m4 CONFIGURED_BISON=byacc  TMPDIR="/tmp" MAKE=gmake PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh CONFIG_SITE=/usr/ports/Templates/config.site lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} ../configure ${CONFIGURE_ARGS} )
