@@ -99,7 +99,12 @@ fi
 mkdir $obj
 
 # Next, run configure
-CONFIGURE_ARGS="--enable-targets=all  --with-gdb-datadir=${datadir}  --with-separate-debug-dir=/usr/lib/debug    --without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui --prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ --build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} --disable-ld --enable-64-bit-bfd ${CXX_CFG}"
+CONFIGURE_ARGS="--enable-targets=all \
+--with-gdb-datadir=${datadir} --with-separate-debug-dir=/usr/lib/debug \
+--without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui \
+--prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ \
+--build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} \
+--disable-ld --enable-64-bit-bfd ${CXX_CFG}"
 
 if [ -n "${XMIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
@@ -111,4 +116,19 @@ elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
 
-(cd $obj; env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}"  CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing -std=gnu89" CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing  -DLIBICONV_PLUG"  LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS=""  INSTALL="/usr/bin/install -c "  INSTALL_DATA="install   -m 0644"  INSTALL_LIB="install    -m 444"  INSTALL_PROGRAM="install    -m 555"  INSTALL_SCRIPT="install   -m 555"  CONFIGURED_M4=m4 CONFIGURED_BISON=byacc  TMPDIR="/tmp" MAKE=gmake PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh CONFIG_SITE=/usr/ports/Templates/config.site lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} ../configure ${CONFIGURE_ARGS} )
+(cd $obj;
+ env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
+     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing -std=gnu89" \
+     CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" \
+     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing" \
+     LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS="" \
+     INSTALL="/usr/bin/install -c " \
+     INSTALL_DATA="install   -m 0644" \
+     INSTALL_LIB="install    -m 444" \
+     INSTALL_PROGRAM="install    -m 555" \
+     INSTALL_SCRIPT="install   -m 555" \
+     CONFIGURED_M4=m4 CONFIGURED_BISON=byacc TMPDIR="/tmp" MAKE=gmake \
+     PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh \
+     CONFIG_SITE=/usr/ports/Templates/config.site \
+     lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} \
+     ../configure ${CONFIGURE_ARGS} )
