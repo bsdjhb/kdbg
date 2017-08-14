@@ -40,8 +40,8 @@ elif [ -n "${XMIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips/rootfs"
-    CC="mips-unknown-freebsd11.0-gcc -nostdinc -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.0-g++ -nostdinc -nostdinc++ -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.1-gcc -nostdinc -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPS64}" ]; then
@@ -50,8 +50,8 @@ elif [ -n "${XMIPS64}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips64/rootfs"
-    CC="mips-unknown-freebsd11.0-gcc -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.0-g++ -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.1-gcc -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${CHERI_MIPS}" ]; then
