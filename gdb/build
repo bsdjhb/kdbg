@@ -59,8 +59,9 @@ elif [ -n "${CHERI_MIPS}" ]; then
     version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
-    CC="/usr/cheri/bin/clang --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -mstack-alignment=32 -fuse-ld=lld -Wno-unused-command-line-argument"
-    CXX="/usr/cheri/bin/clang++ --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -mstack-alignment=32 -fuse-ld=lld -Wno-unused-command-line-argument"
+    CC="/usr/cheri/bin/clang --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -mstack-alignment=32"
+    CXX="/usr/cheri/bin/clang++ --sysroot=/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/usr/bin -B /usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp/legacy/usr/bin -msoft-float -mstack-alignment=32"
+    LDFLAGS="-fuse-ld=lld"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
     WERROR="--disable-werror"
