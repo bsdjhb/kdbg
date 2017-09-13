@@ -44,6 +44,16 @@ elif [ -n "${XMIPS}" ]; then
     CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${XMIPSN32}" ]; then
+    obj=obj.mipsn32
+    version=12.0
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    ROOTFS="/home/john/work/qemu/mipsn32/rootfs"
+    CC="mips-unknown-freebsd11.1-gcc -nostdinc -mabi=n32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -mabi=n32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPS64}" ]; then
     obj=obj.mips64
     version=12.0
@@ -119,6 +129,8 @@ CONFIGURE_ARGS="--enable-targets=all \
 
 if [ -n "${XMIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
+elif [ -n "${XMIPSN32}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 elif [ -n "${XMIPS64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 elif [ -n "${XAARCH64}" ]; then
