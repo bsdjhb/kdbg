@@ -32,7 +32,8 @@ The dtrace/ subdirectory holds various DTrace scripts.
 
 Filename | Description
 --- | ---
-callout_funcs.d | Simple histograms of timer functions
+callout\_funcs.d | Simple histograms of timer functions
+crypto_drivers.d | Histogram of which drivers are used to service OpenCrypto requests
 eperm.d | Determine the source of an `EPERM` error from `stat()`
 g_media.d | Trace source of ZFS `SPA_PROBE` requests.
 ipmi_req.d | Trace ioctl requests to `/dev/ipmi0`
