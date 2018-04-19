@@ -34,6 +34,7 @@ if [ -n "${WITH_GCC}" ]; then
     CC="${WITH_GCC}"
     CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
     WERROR=""
+    obj=${obj}.gcc
 elif [ -n "${XMIPS}" ]; then
     obj=obj.mips
     version=12.0
@@ -91,9 +92,9 @@ elif [ -n "${CHERI_MIPS}" ]; then
     version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/usr/obj/mips.mips64/usr/home/john/work/cheri/git/cheribsd/tmp"
-    CC="/usr/cheri/bin/clang --sysroot=${ROOTFS} -B ${ROOTFS}/usr/bin -B ${ROOTFS}/legacy/usr/bin -msoft-float -mstack-alignment=32"
-    CXX="/usr/cheri/bin/clang++ --sysroot=${ROOTFS} -B ${ROOTFS}/usr/bin -B ${ROOTFS}/legacy/usr/bin -msoft-float -mstack-alignment=32"
+    ROOTFS="/home/john/work/cheri/rootfs"
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
     LDFLAGS="-fuse-ld=lld"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
