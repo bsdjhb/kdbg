@@ -41,8 +41,8 @@ elif [ -n "${XMIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -nostdinc -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -march=mips3 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.1-gcc -march=mips3 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -march=mips3 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XCMIPS}" ]; then
@@ -62,8 +62,8 @@ elif [ -n "${XMIPSN32}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mipsn32/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -nostdinc -mabi=n32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -mabi=n32 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.1-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPS64}" ]; then
@@ -72,8 +72,8 @@ elif [ -n "${XMIPS64}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips64/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -nostdinc -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -nostdinc -nostdinc++ -mabi=64 --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include/c++/v1 -isystem ${ROOTFS}/usr/include -B ${ROOTFS}/usr/lib -L${ROOTFS}/usr/lib -msoft-float"
+    CC="mips-unknown-freebsd11.1-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd11.1-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XCMIPS64}" ]; then
