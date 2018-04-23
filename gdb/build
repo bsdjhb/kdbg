@@ -39,7 +39,7 @@ elif [ -n "${XMIPS}" ]; then
     obj=obj.mips
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/qemu/mips/rootfs"
+    : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc -march=mips3 --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ -march=mips3 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
@@ -48,7 +48,7 @@ elif [ -n "${XCMIPS}" ]; then
     obj=obj.mips
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/qemu/mips/rootfs"
+    : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
     CCDIR="/usr/obj/mips.mips/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
     CC="${CCDIR}/cc -target mips-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
     CXX="${CCDIR}/c++ -target mips-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
@@ -58,7 +58,7 @@ elif [ -n "${XMIPSN32}" ]; then
     obj=obj.mipsn32
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/qemu/mipsn32/rootfs"
+    : ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
@@ -67,7 +67,7 @@ elif [ -n "${XMIPS64}" ]; then
     obj=obj.mips64
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/qemu/mips64/rootfs"
+    : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
@@ -76,7 +76,7 @@ elif [ -n "${XCMIPS64}" ]; then
     obj=obj.mips64
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/qemu/mips64/rootfs"
+    : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
     CCDIR="/usr/obj/mips.mips64/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
     CC="${CCDIR}/cc -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
     CXX="${CCDIR}/c++ -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
@@ -86,7 +86,7 @@ elif [ -n "${CHERI_MIPS}" ]; then
     obj=obj.cheri
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/home/john/work/cheri/rootfs"
+    : ${ROOTFS:="/home/john/work/cheri/rootfs"}
     CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
     CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
     LDFLAGS="-fuse-ld=lld"
@@ -98,7 +98,7 @@ elif [ -n "${XAARCH64}" ]; then
     obj=obj.aarch64
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/mnt"
+    : ${ROOTFS:="/mnt"}
     LDFLAGS="-fuse-ld=lld"
     CC="clang -target aarch64-freebsd12.0 --sysroot=${ROOTFS}"
     CXX="clang++ -target aarch64-freebsd12.0 --sysroot=${ROOTFS}"
@@ -108,7 +108,7 @@ elif [ -n "${XARM}" ]; then
     obj=obj.arm
     PYTHON=""
     PYTHON_CFG="--without-python"
-    ROOTFS="/mnt"
+    : ${ROOTFS:="/mnt"}
     LDFLAGS="-fuse-ld=lld"
     CC="clang -target armv6-gnueabihf-freebsd12.0 --sysroot=${ROOTFS}"
     CXX="clang++ -target armv6-gnueabihf-freebsd12.0 --sysroot=${ROOTFS}"
