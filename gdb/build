@@ -37,17 +37,15 @@ if [ -n "${WITH_GCC}" ]; then
     obj=${obj}.gcc
 elif [ -n "${XMIPS}" ]; then
     obj=obj.mips
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -march=mips3 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -march=mips3 --sysroot=${ROOTFS} -msoft-float"
+    CC="mips-unknown-freebsd${version}-gcc -march=mips3 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd${version}-g++ -march=mips3 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XCMIPS}" ]; then
     obj=obj.mips
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips/rootfs"
@@ -58,27 +56,24 @@ elif [ -n "${XCMIPS}" ]; then
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPSN32}" ]; then
     obj=obj.mipsn32
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mipsn32/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
+    CC="mips-unknown-freebsd${version}-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd${version}-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XMIPS64}" ]; then
     obj=obj.mips64
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips64/rootfs"
-    CC="mips-unknown-freebsd11.1-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd11.1-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
+    CC="mips-unknown-freebsd${version}-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd${version}-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XCMIPS64}" ]; then
     obj=obj.mips64
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/qemu/mips64/rootfs"
@@ -89,7 +84,6 @@ elif [ -n "${XCMIPS64}" ]; then
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${CHERI_MIPS}" ]; then
     obj=obj.cheri
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/home/john/work/cheri/rootfs"
@@ -102,7 +96,6 @@ elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XAARCH64}" ]; then
     obj=obj.aarch64
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/mnt"
@@ -113,7 +106,6 @@ elif [ -n "${XAARCH64}" ]; then
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XARM}" ]; then
     obj=obj.arm
-    version=12.0
     PYTHON=""
     PYTHON_CFG="--without-python"
     ROOTFS="/mnt"
