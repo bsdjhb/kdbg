@@ -35,7 +35,7 @@ define fe_cxgbc_helper
 	end
     end
 end
-    
+
 define fe_cxgbc
     devwalk fe_cxgbc_helper $arg0
 end
@@ -43,11 +43,11 @@ end
 define tcam_helper
     printf "%s: %d entries", $arg0->dev->nameunit, $arg0->mc5.tcam_size
     if ($arg0->params.offload)
-        printf " (offload)"
+	printf " (offload)"
     end
     printf "\n"
 end
-    
+
 define tcam
     fe_cxgbc tcam_helper
 end
@@ -183,10 +183,10 @@ define txd
     set $txd = $arg0
     set $cpl = (struct cpl_tx_pkt *)$txd
     if ($osrelease >= '8')
-        bswap32 $cpl->wr.u.ilp32.wr_lo $_wrlo
+	bswap32 $cpl->wr.u.ilp32.wr_lo $_wrlo
 	bswap32 $cpl->wr.u.ilp32.wr_hi $_wrhi
     else
-        bswap32 $cpl->wr.wr_lo $_wrlo
+	bswap32 $cpl->wr.wr_lo $_wrlo
 	bswap32 $cpl->wr.wr_hi $_wrhi
     end
     printf "wr hi: 0x%08lx  lo: 0x%08lx\n", $_wrhi, $_wrlo
@@ -266,7 +266,7 @@ define cpl
 	    $_cpl->status, $_snd_nxt, $_rcv_nxt
     end
     if ($_ot->opcode == $CPL_RX_DATA)
-        set $_cpl = (struct cpl_rx_data *)$_ot
+	set $_cpl = (struct cpl_rx_data *)$_ot
 	bswap16 $_cpl->len $_len
 	printf " (RX_DATA) len %d", $_len
 	if ($_cpl->ddp_off)
@@ -276,22 +276,22 @@ define cpl
 	end
     end
     if ($_ot->opcode == $CPL_RX_PKT)
-        set $_cpl = (struct cpl_rx_pkt *)$_ot
+	set $_cpl = (struct cpl_rx_pkt *)$_ot
 	printf " (RX_PKT)"
-        if ($_cpl->vlan_ex)
-             bswap16 $_cpl->vlan $_vlan
+	if ($_cpl->vlan_ex)
+	     bswap16 $_cpl->vlan $_vlan
 	     printf " vlan %d", $_vlan
-        end
+	end
     end
     if ($_ot->opcode == $CPL_PASS_ESTABLISH)
 	set $_cpl = (struct cpl_pass_establish *)$_ot
 	printf " (PASS_ESTABLISH)"
     end
     if ($_ot->opcode == $CPL_RX_DATA_DDP)
-        set $_cpl = (struct cpl_rx_data_ddp *)$_ot
+	set $_cpl = (struct cpl_rx_data_ddp *)$_ot
 	printf " (RX_DATA_DDP)"
 	bswap32 $_cpl->ddpvld $_vld
-	if ($_vld & $DDP_ERR)	
+	if ($_vld & $DDP_ERR)
 	    printf " invalid (%x)", $_vld
 	else
 	    bswap32 $_cpl->u.ddp_report $_report
@@ -316,21 +316,21 @@ define iq_msg
     set $_rspd_type = ($_ctrl->u.type_gen >> $S_RSPD_TYPE) & $M_RSPD_TYPE
     bswap16 $_rss->qid $_qid
     printf "[%2d]: gen %d qid %d", $arg1, $_ctrl->u.type_gen >> $S_RSPD_GEN, \
-        $_qid
+	$_qid
     bswap32 $_ctrl->pldbuflen_qid $_lq
     if $_rspd_type == $X_RSPD_TYPE_FLBUF
 	printf " FLBUF len: %d CPL %02x", $_lq & $M_RSPD_LEN, $_rss->opcode
     else
-        if $_rspd_type == $X_RSPD_TYPE_CPL
+	if $_rspd_type == $X_RSPD_TYPE_CPL
 	    set $_cpl = $_rss + 1
 	    cpl $_cpl
-        else
+	else
 	    if $_rspd_type == $X_RSPD_TYPE_INTR
-                printf " INTR %d", $_lq
+		printf " INTR %d", $_lq
 	    else
-	        printf " type %d", $_rspd_type
+		printf " type %d", $_rspd_type
 	    end
-        end
+	end
     end
     printf "\n"
 end
@@ -339,7 +339,7 @@ define iq_msg_raw
     set $_base = (char *)$arg0->desc + ($arg1 * $IQ_ESIZE)
     set $_offset = 0
     while ($_offset < $IQ_ESIZE)
-        printf "%02x ", ((unsigned)*$_base) & 0xff
+	printf "%02x ", ((unsigned)*$_base) & 0xff
 	set $_offset = $_offset + 1
 	set $_base = $_base + 1
 	if ($_offset % 16 == 0)
@@ -353,8 +353,8 @@ define intrq
     printf "cntxt_id: %d  qsize: %d\n", $_iq->cntxt_id, $_iq->qsize
     set $_i = 0
     while ($_i < $_iq->qsize)
-        iq_msg $_iq $_i
-        set $_i = $_i + 1
+	iq_msg $_iq $_i
+	set $_i = $_i + 1
     end
 end
 
@@ -461,7 +461,7 @@ define eq_msg
     bswap32 $_hdr[1] $_equiq_to_len16
     set $_wr_op = ($_op_immdlen >> $S_FW_WR_OP) & $M_FW_WR_OP
     set $_len16 = ($_equiq_to_len16 >> $S_FW_WR_LEN16) & $M_FW_WR_LEN16
-    printf "[%2d]: fw op %#x len16 %d",  $arg1, $_wr_op, $_len16
+    printf "[%2d]: fw op %#x len16 %d", $arg1, $_wr_op, $_len16
     if ($_wr_op == $FW_ULPTX_WR)
 	set $_wr = (struct fw_ulptx_wr *)$_hdr
 	printf " ULPTX"
@@ -473,12 +473,12 @@ define eq_msg
 	cpl_msg
     end
     if ($_wr_op == $FW_ETH_TX_PKT_WR)
-        set $_wr = (struct fw_eth_tx_pkt_wr *)$_hdr
+	set $_wr = (struct fw_eth_tx_pkt_wr *)$_hdr
 	cpl_msg
     end
     if ($_wr_op == $FW_ETH_TX_PKT_VM_WR)
-        set $_wr = (struct fw_eth_tx_pkt_vm_wr *)$_hdr
-        cpl_msg
+	set $_wr = (struct fw_eth_tx_pkt_vm_wr *)$_hdr
+	cpl_msg
     end
     printf "\n"
 end
@@ -502,7 +502,7 @@ define eq_msgs
     set $_idx = $arg1
     set $_count = $arg2
     while ($_count-- > 0)
-        eq_msg $arg0 $_idx
+	eq_msg $arg0 $_idx
 	if ($_len16 == 0)
 	    set $_idx = $_idx + 1
 	else
@@ -514,7 +514,7 @@ end
 define eq_buf_ring
     set $_eq = (struct sge_eq *)$arg0
     printf "cntxt_id: %d  qsize: %d  cap:  %d\n", \
-        $_eq->cntxt_id, $_eq->qsize, $_eq->cap
+	$_eq->cntxt_id, $_eq->qsize, $_eq->cap
     bswap32 $_eq->spg->qid $_qid
     bswap16 $_eq->spg->cidx $_cidx
     bswap16 $_eq->spg->pidx $_pidx
@@ -525,7 +525,7 @@ define eq_mp_ring
     set $_eq = (struct sge_eq *)$arg0
     set $_eq_spg = (struct sge_qstat *)&$_eq->desc[$_eq->sidx]
     printf "cntxt_id: %d  sidx:  %d  cidx: %d  pidx: %d  dbidx: %d\n", \
-        $_eq->cntxt_id, $_eq->sidx, $_eq->cidx, $_eq->pidx, $_eq->dbidx
+	$_eq->cntxt_id, $_eq->sidx, $_eq->cidx, $_eq->pidx, $_eq->dbidx
     bswap32 $_eq_spg->qid $_qid
     bswap16 $_eq_spg->cidx $_cidx
     bswap16 $_eq_spg->pidx $_pidx
@@ -535,16 +535,16 @@ end
 define eq
     # XXX: Not a perfect test
     if (osreldate >= 1100052 || (osreldate < 1100000 && osreldate >= 1001518))
-        eq_mp_ring $arg0
+	eq_mp_ring $arg0
     else
-        eq_buf_ring $arg0
+	eq_buf_ring $arg0
     end
 end
 
 define iq
     set $_iq = (struct sge_iq *)$arg0
     printf "cntxt_id: %d  qsize: %d\n", \
-        $_iq->cntxt_id, $_iq->qsize
+	$_iq->cntxt_id, $_iq->qsize
     set $_offset = (char *)$_iq->desc + (($_iq->qsize - 1) * $IQ_ESIZE)
     set $_iq_spg = (struct sge_qstat *)$_offset
     bswap32 $_iq_spg->qid $_qid
@@ -589,7 +589,7 @@ define vis_helper
     printf "%s: pi %p\n", $arg0->dev->nameunit, $arg0
     set $i = 0
     while ($i < $arg0->nvi)
-        set $vi = &$arg0->vi[$i]
+	set $vi = &$arg0->vi[$i]
 	printf " [%d]: %s: %p\n", $i, $vi->dev->nameunit, $vi
 	set $i = $i + 1
     end
