@@ -2444,7 +2444,7 @@ define bswap64
     set $_hi32 = ($arg0 >> 32) & 0xffffffff
     bswap32 $_lo32 $_lo32s
     bswap32 $_hi32 $_hi32s
-    set $arg1 = ((uint64_t)$_hi32s << 32) | $_lo32s
+    set $arg1 = ((uint64_t)$_lo32s << 32) | $_hi32s
 end
 
 define print_ether_addr
