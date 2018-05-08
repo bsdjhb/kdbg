@@ -218,6 +218,11 @@ define fe_cxgbe_helper
 	    set $pi = (struct port_info *)$arg1->softc
 	    $arg0 $pi
 	end
+	if ($arg1->nameunit[0] == 'c' && $arg1->nameunit[1] == 'c' && \
+	    $arg1->nameunit[2] >= '0' && $arg1->nameunit[2] <= '9')
+	    set $pi = (struct port_info *)$arg1->softc
+	    $arg0 $pi
+	end
     end
 end
 
@@ -276,7 +281,7 @@ define cpl
         if ($_cpl->vlan_ex)
              bswap16 $_cpl->vlan $_vlan
 	     printf " vlan %d", $_vlan
-        end	
+        end
     end
     if ($_ot->opcode == $CPL_PASS_ESTABLISH)
 	set $_cpl = (struct cpl_pass_establish *)$_ot
@@ -353,6 +358,8 @@ define intrq
     end
 end
 
+set $EQ_ESIZE = 64
+
 set $S_FW_WR_OP = 24
 set $M_FW_WR_OP = 0xff
 
@@ -362,35 +369,59 @@ set $M_FW_WR_IMMDLEN = 0xff
 set $S_FW_WR_LEN16 = 0
 set $M_FW_WR_LEN16 = 0xff
 
+set $FW_ULPTX_WR = 0x04
+set $FW_TP_WR = 0x05
 set $FW_ETH_TX_PKT_WR = 0x08
 set $FW_ETH_TX_PKT_VM_WR = 0x11
 
 set $S_CPL_OPCODE = 24
 
+set $CPL_ACT_OPEN_REQ = 0x3
+set $CPL_SET_TCB_FIELD = 0x5
 set $CPL_TX_PKT = 0xe
 set $CPL_TX_PKT_LSO = 0xed
 set $CPL_TX_PKT_XT = 0xee
+
+set $F_NO_REPLY = (1 << 15)
 
 set $S_ULPTX_NSGE = 0
 set $M_ULPTX_NSGE = 0xFFFF
 
 define cpl_msg
-    set $_hdr = (uint32_t *)($_wr + 1)
-    bswap32 $_hdr[0] $_cpl_op
-    set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
-    printf " CPL %#x", $_cpl_op
-    if ($_cpl_op == $CPL_TX_PKT_LSO)
+    set $_ot = (union opcode_tid *)($_wr + 1)
+    bswap32 $_ot->opcode_tid $_tid
+    set $_tid = $_tid & 0xFFFFFF
+    printf " CPL %02x tid %d", $_ot->opcode, $_tid
+    if ($_ot->opcode == $CPL_ACT_OPEN_REQ)
+	printf " ACT_OPEN_REQ"
+    end
+    if ($_ot->opcode == $CPL_SET_TCB_FIELD)
+	printf " SET_TCB_FIELD"
+	set $_cpl = (struct cpl_set_tcb_field_core *)$_ot
+	bswap16 $_cpl->reply_ctrl $_reply_ctrl
+	if ($_reply_ctrl & $F_NO_REPLY)
+	    printf " NO_REPLY"
+	end
+	bswap16 $_cpl->word_cookie $_word_cookie
+	printf " word %#x cookie %#x", $_word_cookie & 0x1F, \
+	    ($_word_cookie >> 5) & 0x7
+	bswap64 $_cpl->mask $_mask
+	printf " mask %#lx", $_mask
+	bswap64 $_cpl->val $_val
+	printf " val %#lx", $_val
+    end
+    if ($_ot->opcode == $CPL_TX_PKT_LSO)
 	printf " LSO"
-	set $_lso = (struct cpl_tx_pkt_lso_core *)$_hdr
+	set $_lso = (struct cpl_tx_pkt_lso_core *)$_ot
 	set $_hdr = (uint32_t *)($_lso + 1)
 	bswap32 $_hdr[0] $_cpl_op
 	set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
-	printf " CPL %#x", $_cpl_op
+	printf " CPL %02x", $_cpl_op
     end
-    if ($_cpl_op == $CPL_TX_PKT || $_cpl_op == $CPL_TX_PKT_XT)
+    if ($_ot->opcode == $CPL_TX_PKT || $_ot->opcode == $CPL_TX_PKT_XT)
 	set $_cpl = (struct cpl_tx_pkt_core *)$_hdr
 	bswap16 $_cpl->len $_pktlen
-	if ($_cpl_op == $CPL_TX_PKT)
+	if ($_ot->opcode == $CPL_TX_PKT)
 	    printf " TXPKT (pktlen %d)", $_pktlen
 	else
 	    printf " TXPKT_XT (pktlen %d)", $_pktlen
@@ -408,15 +439,15 @@ define cpl_msg
 	    set $_seg_idx = 1
 	    bswap64 $_usgl->addr0 $_sgaddr
 	    bswap32 $_usgl->len0 $_sglen
-	    printf "\n	[0]: %#llx : %#x", $_sgaddr, $_sglen
+	    printf "\n\t[0]: %#llx : %#x", $_sgaddr, $_sglen
 	    set $_segs = $_usgl->sge
 	    while ($_seg_idx < $_nsegs)
 		bswap64 $_segs->addr[0] $_sgaddr
 		bswap32 $_segs->len[0] $_sglen
-		printf "\n  [%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
+		printf "\n\t[%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
 		bswap64 $_segs->addr[1] $_sgaddr
 		bswap32 $_segs->len[1] $_sglen
-		printf "\n  [%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, $_sglen
+		printf "\n\t[%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, $_sglen
 		set $_seg_idx = $_seg_idx + 2
 		set $_segs = $_segs + 1
 	    end
@@ -431,6 +462,16 @@ define eq_msg
     set $_wr_op = ($_op_immdlen >> $S_FW_WR_OP) & $M_FW_WR_OP
     set $_len16 = ($_equiq_to_len16 >> $S_FW_WR_LEN16) & $M_FW_WR_LEN16
     printf "[%2d]: fw op %#x len16 %d",  $arg1, $_wr_op, $_len16
+    if ($_wr_op == $FW_ULPTX_WR)
+	set $_wr = (struct fw_ulptx_wr *)$_hdr
+	printf " ULPTX"
+	# not a CPL, would have to parse ULPTX
+    end
+    if ($_wr_op == $FW_TP_WR)
+	# Really struct fw_tp_wr, but this is the same size
+	set $_wr = (struct fw_ulptx_wr *)$_hdr
+	cpl_msg
+    end
     if ($_wr_op == $FW_ETH_TX_PKT_WR)
         set $_wr = (struct fw_eth_tx_pkt_wr *)$_hdr
 	cpl_msg
@@ -440,6 +481,20 @@ define eq_msg
         cpl_msg
     end
     printf "\n"
+end
+
+# <eq> <index>
+define eq_msg_raw
+    set $_base = (char *)&$arg0->desc[$arg1]
+    set $_offset = 0
+    while ($_offset < $EQ_ESIZE)
+	printf "%02x ", ((unsigned)*$_base) & 0xff
+	set $_offset = $_offset + 1
+	set $_base = $_base + 1
+	if ($_offset % 16 == 0)
+	    printf "\n"
+	end
+    end
 end
 
 # <eq> <start> <count>
@@ -498,17 +553,26 @@ define iq
     printf "spg qid: %d  cidx: %d  pidx:  %d\n", $_qid, $_cidx, $_pidx
 end
 
-define queues_helper
+define queues_vi_helper
     printf "%s: queues:\n", $arg0->ifp->if_xname
     set $i = 0
     while ($i < $arg0->nrxq)
-	printf "  rxq %d: %p\n", $i, $arg0->adapter->sge.rxq + $arg0->first_rxq + $i
+	printf "  rxq %d: %p\n", $i, $arg0->pi->adapter->sge.rxq + $arg0->first_rxq + $i
 	set $i = $i + 1
     end
     set $i = 0
     while ($i < $arg0->ntxq)
-	printf "  txq %d: %p\n", $i, $arg0->adapter->sge.txq + $arg0->first_txq + $i
+	printf "  txq %d: %p\n", $i, $arg0->pi->adapter->sge.txq + $arg0->first_txq + $i
 	set $i = $i + 1
+    end
+end
+
+define queues_helper
+    set $j = 0
+    while ($j < $arg0->nvi)
+	set $vi = &$arg0->vi[$j]
+	queues_vi_helper $vi
+	set $j = $j + 1
     end
 end
 
