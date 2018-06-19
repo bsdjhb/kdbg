@@ -413,13 +413,11 @@ define cpl_msg
     if ($_ot->opcode == $CPL_TX_PKT_LSO)
 	printf " LSO"
 	set $_lso = (struct cpl_tx_pkt_lso_core *)$_ot
-	set $_hdr = (uint32_t *)($_lso + 1)
-	bswap32 $_hdr[0] $_cpl_op
-	set $_cpl_op = $_cpl_op >> $S_CPL_OPCODE
-	printf " CPL %02x", $_cpl_op
+	set $_ot = (union opcode_tid *)($_lso + 1)
+	printf " CPL %02x", $_ot->opcode
     end
     if ($_ot->opcode == $CPL_TX_PKT || $_ot->opcode == $CPL_TX_PKT_XT)
-	set $_cpl = (struct cpl_tx_pkt_core *)$_hdr
+	set $_cpl = (struct cpl_tx_pkt_core *)$_ot
 	bswap16 $_cpl->len $_pktlen
 	if ($_ot->opcode == $CPL_TX_PKT)
 	    printf " TXPKT (pktlen %d)", $_pktlen
@@ -428,7 +426,7 @@ define cpl_msg
 	end
 	set $_immdlen = ($_op_immdlen >> $S_FW_WR_IMMDLEN) & $M_FW_WR_IMMDLEN
 	# Subtract out LSO header if it exists
-	set $_immdlen = $_immdlen - ((uintptr_t)$_hdr - (uintptr_t)($_wr + 1))
+	set $_immdlen = $_immdlen - ((uintptr_t)$_ot - (uintptr_t)($_wr + 1))
 	set $_immdlen = $_immdlen - sizeof(struct cpl_tx_pkt_core)
 	if ($_immdlen > 0)
 	    printf " immediate"
@@ -436,20 +434,30 @@ define cpl_msg
 	    set $_usgl = (struct ulptx_sgl *)($_cpl + 1)
 	    bswap32 $_usgl->cmd_nsge $_cmd_nsge
 	    set $_nsegs = ($_cmd_nsge >> $S_ULPTX_NSGE) & $M_ULPTX_NSGE
-	    set $_seg_idx = 1
-	    bswap64 $_usgl->addr0 $_sgaddr
-	    bswap32 $_usgl->len0 $_sglen
-	    printf "\n\t[0]: %#llx : %#x", $_sgaddr, $_sglen
-	    set $_segs = $_usgl->sge
-	    while ($_seg_idx < $_nsegs)
-		bswap64 $_segs->addr[0] $_sgaddr
-		bswap32 $_segs->len[0] $_sglen
-		printf "\n\t[%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
-		bswap64 $_segs->addr[1] $_sgaddr
-		bswap32 $_segs->len[1] $_sglen
-		printf "\n\t[%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, $_sglen
-		set $_seg_idx = $_seg_idx + 2
-		set $_segs = $_segs + 1
+	    if ($eq_verbose)
+	        set $_seg_idx = 1
+		bswap64 $_usgl->addr0 $_sgaddr
+		bswap32 $_usgl->len0 $_sglen
+		printf "\n\t[0]: %#llx : %#x", $_sgaddr, $_sglen
+		set $_segs = $_usgl->sge
+		while ($_seg_idx + 1 < $_nsegs)
+		    bswap64 $_segs->addr[0] $_sgaddr
+		    bswap32 $_segs->len[0] $_sglen
+		    printf "\n\t[%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
+		    bswap64 $_segs->addr[1] $_sgaddr
+		    bswap32 $_segs->len[1] $_sglen
+		    printf "\n\t[%d]: %#llx : %#x", $_seg_idx + 1, $_sgaddr, \
+		        $_sglen
+		    set $_seg_idx = $_seg_idx + 2
+		    set $_segs = $_segs + 1
+		end
+		if ($_seg_idx < $_nsegs)
+		    bswap64 $_segs->addr[0] $_sgaddr
+		    bswap32 $_segs->len[0] $_sglen
+		    printf "\n\t[%d]: %#llx : %#x", $_seg_idx, $_sgaddr, $_sglen
+		end
+	    else
+	        printf " %d segs", $_nsegs
 	    end
 	end
     end
