@@ -366,6 +366,9 @@ set $M_FW_WR_OP = 0xff
 set $S_FW_WR_IMMDLEN = 0
 set $M_FW_WR_IMMDLEN = 0xff
 
+set $F_FW_WR_EQUIQ = (1 << 31)
+set $F_FW_WR_EQUEQ = (1 << 30)
+
 set $S_FW_WR_LEN16 = 0
 set $M_FW_WR_LEN16 = 0xff
 
@@ -470,6 +473,12 @@ define eq_msg
     set $_wr_op = ($_op_immdlen >> $S_FW_WR_OP) & $M_FW_WR_OP
     set $_len16 = ($_equiq_to_len16 >> $S_FW_WR_LEN16) & $M_FW_WR_LEN16
     printf "[%2d]: fw op %#x len16 %d", $arg1, $_wr_op, $_len16
+    if ($_equiq_to_len16 & $F_FW_WR_EQUIQ)
+	printf " UIQ"
+    end
+    if ($_equiq_to_len16 & $F_FW_WR_EQUEQ)
+	printf " UEQ"
+    end
     if ($_wr_op == $FW_ULPTX_WR)
 	set $_wr = (struct fw_ulptx_wr *)$_hdr
 	printf " ULPTX"
