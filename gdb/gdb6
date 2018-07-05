@@ -2691,7 +2691,11 @@ define inaddr
     printf ":"
     print_port $_ie.ie_fport
     printf "\n"
-    set $_imo = ((struct inpcb *)$arg0)->inp_depend4.inp4_moptions
+    if (osreldate >= 1200026)
+	set $_imo = ((struct inpcb *)$arg0)->inp_moptions
+    else
+	set $_imo = ((struct inpcb *)$arg0)->inp_depend4.inp4_moptions
+    end
     if ($_imo != 0)
 	imo $_imo
     end
