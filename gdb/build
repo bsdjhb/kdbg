@@ -140,7 +140,7 @@ CONFIGURE_ARGS="--enable-targets=all \
 --without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui \
 --prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} \
---disable-ld --enable-64-bit-bfd ${CXX_CFG}"
+--disable-ld --enable-64-bit-bfd --disable-ubsan ${CXX_CFG}"
 
 if [ -n "${XMIPS}" -o -n "${XCMIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
