@@ -1876,7 +1876,20 @@ document devinfo
 Show new-bus heirarchy similar to devinfo(8).
 end
 
-# Pring a single mbuf
+define lspci
+    set $_dinfo = pci_devq.stqh_first
+    while ($_dinfo != 0)
+	printf "%p: pci%d:%d:%d:%d", $_dinfo, $_dinfo->cfg.domain, \
+	    $_dinfo->cfg.bus, $_dinfo->cfg.slot, $_dinfo->cfg.func
+	if ($_dinfo->cfg.dev != 0 && $_dinfo->cfg.dev->nameunit != 0)
+	    printf " (%s)", $_dinfo->cfg.dev->nameunit
+	end
+	printf "\n"
+	set $_dinfo = $_dinfo->pci_links.stqe_next
+    end
+end
+
+# Print a single mbuf
 define dumpmbuf_10
     printf "%p: %d bytes", $arg0, $arg0->m_hdr.mh_len
     if ($arg0->m_hdr.mh_flags & $M_EXT)
