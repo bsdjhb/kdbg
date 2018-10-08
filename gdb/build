@@ -40,8 +40,8 @@ elif [ -n "${XMIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
-    CC="mips-unknown-freebsd${version}-gcc -march=mips3 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd${version}-g++ -march=mips3 --sysroot=${ROOTFS} -msoft-float"
+    CC="mips-unknown-freebsd${version}-gcc --sysroot=${ROOTFS} -msoft-float"
+    CXX="mips-unknown-freebsd${version}-g++ --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 elif [ -n "${XCMIPS}" ]; then
