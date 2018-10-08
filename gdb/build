@@ -114,6 +114,15 @@ elif [ -n "${XARM}" ]; then
     CXX="clang++ -target armv6-gnueabihf-freebsd12.0 --sysroot=${ROOTFS}"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${XRISCV64}" ]; then
+    obj=obj.riscv64
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    : ${ROOTFS:="/ufs/riscv64/rootfs"}
+    CC="riscv64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
+    CXX="riscv64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 else
     CC="cc"
     CXX="c++"
@@ -152,6 +161,8 @@ elif [ -n "${XAARCH64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=aarch64-freebsd --without-expat"
 elif [ -n "${XARM}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=arm-gnueabi-freebsd --without-expat"
+elif [ -n "${XRISCV64}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
 elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
