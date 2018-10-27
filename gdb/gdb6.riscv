@@ -1,0 +1,364 @@
+# riscv-specific kernel macros
+
+set $DMAP_MIN_ADDRESS = (0xffffffd000000000UL)
+set $DMAP_MAX_ADDRESS = (0xfffffff000000000UL)
+
+set $L0_SHIFT = 39
+
+set $L1_SHIFT = 30
+set $L1_SIZE = (1ULL << $L1_SHIFT)
+set $L1_OFFSET = ($L1_SIZE - 1)
+
+set $L2_SHIFT = 21
+set $L2_SIZE = (1ULL << $L2_SHIFT)
+set $L2_OFFSET = ($L2_SIZE - 1)
+
+set $L3_SHIFT = 12
+set $L3_SIZE = (1ULL << $L3_SHIFT)
+set $L3_OFFSET = ($L3_SIZE - 1)
+
+set $Ln_ENTRIES = (1ULL << 9)
+set $Ln_ADDR_MASK = ($Ln_ENTRIES - 1)
+
+set $PAGE_SIZE = $L3_SIZE
+
+set $PTE_D = 0x80
+set $PTE_A = 0x40
+set $PTE_G = 0x20
+set $PTE_U = 0x10
+set $PTE_X = 0x08
+set $PTE_W = 0x04
+set $PTE_R = 0x02
+set $PTE_V = 0x01
+set $PTE_RX = ($PTE_R | $PTE_X)
+set $PTE_RWX = ($PTE_R | $PTE_W | $PTE_X)
+
+set $PTE_PPN0_S = 10
+set $PTE_PPN1_S = 19
+set $PTE_PPN2_S = 28
+set $PTE_PPN3_S = 37
+
+define phys_to_dmap
+    set $arg1 = ((long)$arg0 - dmap_phys_base) | $DMAP_MIN_ADDRESS
+end
+
+document phys_to_dmap
+Given a physical address, return the corresponding virtual address in the
+direct map in the 2nd arg.
+end
+
+define pmap_l1
+    set $_pm = (struct pmap *)$arg0
+    set $_va = (long)$arg1
+    if ($_pm == 0)
+	set $_pm = &kernel_pmap_store
+    end
+    set $arg2 = $_pm->pm_l1[($_va >> $L1_SHIFT) & $Ln_ADDR_MASK]
+end
+
+document pmap_l1
+Given a pmap and a virtual address, lookup the value of the L1 entry and
+store it in the 3rd arg.
+end
+
+define pmap_l2
+    pmap_l1 $arg0 $arg1 $_l1e
+    if (($_l1e & $PTE_V) == 0)
+	set $arg2 = 0
+    else
+	if (($_l1e & $PTE_RX) != 0)
+	    set $arg2 = $_l1e
+	else
+	    set $_va = (long)$arg1
+	    set $_temp = ((long)$_l1e >> $PTE_PPN0_S) * $PAGE_SIZE
+	    phys_to_dmap $_temp $_l2t
+	    set $arg2 = ((uint64_t *)$_l2t)[($_va >> $L2_SHIFT) & $Ln_ADDR_MASK]
+	end
+    end
+end
+
+document pmap_l2
+Given a pmap and a virtual address, lookup the value of the L2 entry and
+store it in the 3rd arg.
+end
+
+define pmap_l3
+    pmap_l2 $arg0 $arg1 $_l2e
+    if (($_l2e & $PTE_V) == 0)
+	set $arg2 = 0
+    else
+	if (($_l2e & $PTE_RX) != 0)
+	    set $arg2 = $_l2e
+	else
+	    set $_va = (long)$arg1
+	    set $_temp = ((long)$_l1e >> $PTE_PPN0_S) * $PAGE_SIZE
+	    phys_to_dmap $_temp $_l3t
+	    set $arg2 = ((uint64_t *)$_l3t)[($_va >> $L3_SHIFT) & $Ln_ADDR_MASK]
+	end
+    end
+end
+
+document pmap_l3
+Given a pmap and a virtual address, lookup the value of the L3 entry and
+store it in the 3rd arg.
+end
+
+define pmap_kextract
+    set $va = (long)$arg0
+    set $pa = -1
+    if ($va >= $DMAP_MIN_ADDRESS && $va <= $DMAP_MAX_ADDRESS)
+	set $pa = $va - $DMAP_MIN_ADDRESS
+    else
+	pmap_l3 0 $arg0 $l3e
+	if ($l3e & $PTE_V)
+	    set $pa = ($l3e >> $PTE_PPN0_S) * $PAGE_SIZE
+	end
+    end
+    if ($pa == -1)
+	printf "Invalid, unmapped, or unfaulted address\n"
+    else
+	printf "KVA %p => 0x%lx\n", $va, $pa
+    end
+end
+
+document pmap_kextract
+Map a kernel virtual address to a physical address on riscv.
+'kextract' in kgdb is more portable.
+end
+
+define pmap_extract
+    set $va = (long)$arg1
+    set $pa = -1
+    pmap_l3 $arg0 $arg1 $l3e
+    if ($l3e & $PTE_V)
+	set $pa = ($l3e >> $PTE_PPN0_S) * $PAGE_SIZE
+    end
+    if ($pa == -1)
+	printf "Invalid, unmapped, or unfaulted address\n"
+    else
+	printf "VA %p => 0x%lx\n", $va, $pa
+    end
+end
+
+document pmap_extract
+Map a user virtual address to a physical address on amd64.
+end
+
+define pmap_perms_print
+    if ($start != -1)
+	printf "%p - %p: ", $start, $end
+	if ($perms & $PTE_R)
+	    printf "R"
+	else
+	    printf "-"
+	end
+	if ($perms & $PTE_W)
+	    printf "W"
+	else
+	    printf "-"
+	end
+	if ($perms & $PTE_X)
+	    printf "X"
+	else
+	    printf "-"
+	end
+	printf "\n"
+    end
+    set $start = -1
+end
+
+define pmap_perms_l3
+    if (($l3e & $PTE_V) == 0)
+	pmap_perms_print
+    else
+	if ($start == -1 || ($l3e & $PTE_RWX) != $perms)
+	    pmap_perms_print
+	    set $start = $va
+	    set $perms = $l3e & $PTE_RWX
+	end
+	set $end = $va + ($L3_SIZE - 1)
+    end
+    set $va = $va + $L3_SIZE
+end
+
+define pmap_perms_l2
+    if (($l2e & $PTE_V) == 0)
+	pmap_perms_print
+	set $va = $va + $L2_SIZE
+    else
+	if (($l2e & $PTE_RX) != 0)
+	    if ($start == -1 || ($l2e & $PTE_RWX) != $perms)
+		pmap_perms_print
+		set $start = $va
+		set $perms = $l2e & $PTE_RWX
+	    end
+	    set $end = $va + ($L2_SIZE - 1)
+	    set $va = $va + $L2_SIZE
+	else
+	    set $temp3 = (($l2e >> $PTE_PPN0_S) * $PAGE_SIZE)
+	    phys_to_dmap $temp3 $l3t
+	    set $k = 0
+	    while ($k < 512)
+		set $l3e = ((uint64_t *)$l3t)[$k]
+		pmap_perms_l3
+		set $k = $k + 1
+	    end
+	end
+    end
+end
+
+define pmap_perms_l1
+    if (($l1e & $PTE_V) == 0)
+	pmap_perms_print
+	set $va = $va + $L1_SIZE
+    else
+	if (($l1e & $PTE_RX) != 0)
+	    if ($start == -1 || ($l1e & $PTE_RWX) != $perms)
+		pmap_perms_print
+		set $start = $va
+		set $perms = $l1e & $PTE_RWX
+	    end
+	    set $end = $va + ($L1_SIZE - 1)
+	    set $va = $va + $L1_SIZE
+	else
+	    set $temp2 = (($l1e >> $PTE_PPN0_S) * $PAGE_SIZE)
+	    phys_to_dmap $temp2 $l2t
+	    set $j = 0
+	    while ($j < 512)
+		set $l2e = ((uint64_t *)$l2t)[$j]
+		pmap_perms_l2
+		set $j = $j + 1
+	    end
+	end
+    end
+end
+
+define pmap_dump_perms
+    set $pm = (struct pmap *)$arg0
+    if ($pm == 0)
+	set $pm = &kernel_pmap_store
+    end
+
+    set $perms = 0
+    set $start = -1
+    set $end = 0
+    set $i = 0
+    set $va = 0
+    while ($i < 512)
+	set $l1e = $pm->pm_l1[$i]
+	pmap_perms_l1
+	set $i = $i + 1
+	if ($i == 256)
+	    set $va = $va + 0xffffff8000000000
+	end
+    end
+    if ($start != -1)
+	pmap_perms_print
+    end
+end
+      
+define pmap_print_pte
+    set $_indent = $arg0 * 2
+    while ($_indent > 0)
+	printf " "
+	set $_indent = $_indent - 1
+    end
+    printf "%p - %p: ", $va, $va + $arg2 - 1
+    if ($arg1 & $PTE_V)
+	if ($arg1 & $PTE_D)
+	    printf "D"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_A)
+	    printf "A"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_G)
+	    printf "G"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_U)
+	    printf "U"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_X)
+	    printf "X"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_W)
+	    printf "W"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_R)
+	    printf "R"
+	else
+	    printf "-"
+	end
+    else
+        printf "invalid"
+    end
+    printf "\n"
+end
+
+define pmap_dump_l3
+    pmap_print_pte 2 $l3e $L3_SIZE
+    set $va = $va + $L3_SIZE
+end
+
+define pmap_dump_l2
+    if (($l2e & ($PTE_V | $PTE_RX)) == $PTE_V)
+	set $temp3 = (($l2e >> $PTE_PPN0_S) * $PAGE_SIZE)
+	phys_to_dmap $temp3 $l3t
+	set $k = 0
+	while ($k < 512)
+	    set $l3e = ((uint64_t *)$l3t)[$k]
+	    pmap_dump_l3
+	    set $k = $k + 1
+	end
+    else
+	pmap_print_pte 1 $l2e $L2_SIZE
+	set $va = $va + $L2_SIZE
+    end
+end
+
+define pmap_dump_l1
+    if (($l1e & ($PTE_V | $PTE_RX)) == $PTE_V)
+	set $temp2 = (($l1e >> $PTE_PPN0_S) * $PAGE_SIZE)
+	phys_to_dmap $temp2 $l2t
+	set $j = 0
+	while ($j < 512)
+	    set $l2e = ((uint64_t *)$l2t)[$j]
+	    pmap_dump_l2
+	    set $j = $j + 1
+	end
+    else
+        if ($l1e & $PTE_V)
+	    pmap_print_pte 0 $l1e $L1_SIZE
+	end
+	set $va = $va + $L1_SIZE
+    end
+end
+
+define pmap_dump_ptes
+    set $pm = (struct pmap *)$arg0
+    if ($pm == 0)
+	set $pm = &kernel_pmap_store
+    end
+
+    set $i = 0
+    set $va = 0
+    while ($i < 512)
+	set $l1e = $pm->pm_l1[$i]
+	pmap_dump_l1
+	set $i = $i + 1
+	if ($i == 256)
+	    set $va = $va + 0xffffff8000000000
+	end
+    end
+end
