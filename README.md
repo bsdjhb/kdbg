@@ -25,6 +25,7 @@ gdb4 | General commands for use with FreeBSD 4.x
 gdb6 | General commands for use with FreeBSD 6.x and later
 gdb6.amd64 | amd64-specific commands for gdb6.  Included automatically by gdb6 on amd64 kernels.
 gdb6.i386 | i386-specific commands for gdb6.  Included automatically by gdb6 on i386 kernels.
+gdb6.riscv | riscv-specific commands for gdb6.
 
 ## dtrace/
 
