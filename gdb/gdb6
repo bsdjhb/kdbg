@@ -3215,19 +3215,19 @@ define kvm_range
 end
 
 define submap_name_9
-    if ($_submap == kmem_map)
+    if ($arg0 == kmem_map)
 	printf "kmem_map"
     else
-	if ($_submap == pipe_map)
+	if ($arg0 == pipe_map)
 	    printf "pipe_map"
 	else
-	    if ($_submap == exec_map)
+	    if ($arg0 == exec_map)
 		printf "exec_map"
 	    else
-		if ($_submap->header.next->object.sub_map == buffer_map)
+		if ($arg0->header.next->object.sub_map == buffer_map)
 		    printf "buffer_map + pager_map"
 		else
-		    printf "map %p", $_submap
+		    printf "map %p", $arg0
 		end
 	    end
 	end
@@ -3235,16 +3235,16 @@ define submap_name_9
 end
 
 define submap_name_10
-    if ($_submap == pipe_map)
+    if ($arg0 == pipe_map)
 	printf "pipe_map"
     else
-	if ($_submap == exec_map)
+	if ($arg0 == exec_map)
 	    printf "exec_map"
 	else
-	    if ($_submap->header.next->object.sub_map == buffer_map)
+	    if ($arg0->header.next->object.sub_map == buffer_map)
 		printf "buffer_map + pager_map"
 	    else
-		printf "map %p", $_submap
+		printf "map %p", $arg0
 	    end
 	end
     end
@@ -3285,15 +3285,26 @@ end
 define kvm
     set $_entry = kernel_map->header.next
     set $_i = 0
-    if ($osrelease < 8)
-	set $_swapkeg = swap_zone->uz_keg
-	set $_callout = callout
+    if (osreldate >= 1101504)
+        set $_swapkeg = swblk_zone->uz_kegs.lh_first->kl_keg
     else
-	set $_swapkeg = swap_zone->uz_kegs.lh_first->kl_keg
+        if ($osrelease >= 8)
+	    set $_swapkeg = swap_zone->uz_kegs.lh_first->kl_keg
+	else
+	  set $_swapkeg = swap_zone->uz_keg
+	end
+    end
+    if ($osrelease >= 8)
 	set $_callout = cc_cpu[0].cc_callout
+    else
+	set $_callout = callout
     end
     set $_swapstart = $_swapkeg->uk_kva
-    set $_swapend = $_swapstart + $_swapkeg->uk_maxpages * $PAGE_SIZE
+    if ($_swapstart == 0)
+	set $_swapend = 0
+    else
+	set $_swapend = $_swapstart + $_swapkeg->uk_maxpages * $PAGE_SIZE
+    end
     if (mp_ncpus > 1)
 	# XXX - amd64 only
 	set $_bootstacks_start = (long)bootstacks[1]
@@ -3307,11 +3318,12 @@ define kvm
 	kvm_range kernel_map->header.start $_entry->start
 	printf "----\n"
     end
+    set $_end = (long)&_end
     while ($_i < kernel_map.nentries)
-	if (&_end >= $_entry->start && &_end <= $_entry->end)
-	    kvm_range $_entry->start (long)&_end
+	if ($_end >= $_entry->start && $_end <= $_entry->end)
+	    kvm_range $_entry->start $_end
 	    printf "text/data/bss\n"
-	    kvm_range (long)&_end $_entry->end
+	    kvm_range $_end $_entry->end
 	    printf "bootstrap data\n"
 	else
 	    if ($_swapstart >= $_entry->start && $_swapend <= $_entry->end)
@@ -3455,6 +3467,46 @@ end
 
 document vmmap
 Display the entries in a VM map.
+end
+
+set $BT_TYPE_SPAN = 1
+set $BT_TYPE_SPAN_STATIC = 2
+set $BT_TYPE_FREE = 3
+set $BT_TYPE_BUSY = 4
+
+define bt_type_name
+    if ($arg0 == $BT_TYPE_SPAN)
+	printf "SPAN"
+    else
+	if ($arg0 == $BT_TYPE_SPAN_STATIC)
+	    printf "SPAN_STATIC"
+	else
+	    if ($arg0 == $BT_TYPE_FREE)
+		printf "FREE"
+	    else
+		if ($arg0 == $BT_TYPE_BUSY)
+		    printf "BUSY"
+		else
+		    printf "???"
+		end
+	    end
+	end
+    end
+end
+
+define vmem
+    printf "vmem '%s'\n", $arg0->vm_name
+    set $_bt = $arg0->vm_seglist.tqh_first
+    while ($_bt != 0)
+	printf "  %lx %lx, %d ", $_bt->bt_start, $_bt->bt_size, $_bt->bt_type
+	bt_type_name $_bt->bt_type
+	printf "\n"
+	set $_bt = $_bt->bt_seglist.tqe_next
+    end
+end
+
+document vmem
+Display the segments in a vmem.
 end
 
 define ule_load_7
