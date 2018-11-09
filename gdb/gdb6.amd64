@@ -204,45 +204,45 @@ define pmap_check_pgu
     set $pm = &kernel_pmap_store
     set $i = 256
     while ($i < 512)
-        set $pml4e = $pm->pm_pml4[$i]
-        if ($pml4e & ($PG_U | $PG_V)) == ($PG_U | $PG_V)
+	set $pml4e = $pm->pm_pml4[$i]
+	if ($pml4e & ($PG_U | $PG_V)) == ($PG_U | $PG_V)
 	    printf "pml4e[%d]\n", $i
 	    set $_temp = (long)$pml4e & $PG_FRAME
 	    phys_to_dmap $_temp $pdp
 	    set $j = 0
 	    while ($j < 512)
-	        set $pdpe = ((pdp_entry_t *)$pdp)[$j]
+		set $pdpe = ((pdp_entry_t *)$pdp)[$j]
 		if ($pdpe & ($PG_V | $PG_U)) == ($PG_V | $PG_U)
 		    if ($pdpe & $PG_PS)
-		        set $va = $DMAP_MIN_ADDRESS | ($i << $PML4SHIFT) | \
+			set $va = $DMAP_MIN_ADDRESS | ($i << $PML4SHIFT) | \
 			    ($j << $PDPSHIFT)
 			printf "%p: 1GB PG_V | PG_U | PG_PS\n", $va
 		    else
-		        printf "pdpe[%d,%d]\n", $i, $j
-		        set $_temp = (long)$pdpe & $PG_FRAME
+			printf "pdpe[%d,%d]\n", $i, $j
+			set $_temp = (long)$pdpe & $PG_FRAME
 			phys_to_dmap $_temp $pd
 			set $k = 0
 			while ($k < 512)
 			    set $k = $k + 1
 			    set $pde = ((pd_entry_t *)$pd)[$k]
 			    if ($pde & ($PG_V | $PG_U)) == ($PG_V | $PG_U)
-			        if ($pde & $PG_PS)
+				if ($pde & $PG_PS)
 				    set $va = $DMAP_MIN_ADDRESS | \
-				        ($i << $PML4SHIFT) | \
+					($i << $PML4SHIFT) | \
 					($j << $PDPSHIFT) | \
 					($k << $PDRSHIFT)
-			            printf "%p: 2MB PG_V | PG_U | PG_PS\n", \
-				        $va
+				    printf "%p: 2MB PG_V | PG_U | PG_PS\n", \
+					$va
 				else
-		                    printf "pde[%d,%d,%d]\n", $i, $j, $k
-		                    set $_temp = (long)$pde & $PG_FRAME
+				    printf "pde[%d,%d,%d]\n", $i, $j, $k
+				    set $_temp = (long)$pde & $PG_FRAME
 				    phys_to_dmap $_temp $pt
 				    set $l = 0
 				    while ($l < 512)
-				        set $pte = ((pt_entry_t *)$pt)[$l]
+					set $pte = ((pt_entry_t *)$pt)[$l]
 					if ($pte & ($PG_V | $PG_U)) == ($PG_V | $PG_U)
-				            set $va = $DMAP_MIN_ADDRESS | \
-					        ($i << $PML4SHIFT) | \
+					    set $va = $DMAP_MIN_ADDRESS | \
+						($i << $PML4SHIFT) | \
 						($j << $PDPSHIFT) | \
 						($k << $PDRSHIFT) | \
 						($l << $PAGE_SHIFT)
@@ -273,23 +273,23 @@ define pmap_checkpgu_pml4
     set $start = 0
     set $last = $_pm->pm_pml4[0] & $PG_U
     while ($i < 512)
-        if ($_pm->pm_pml4[$i] & $PG_U) != $last
+	if ($_pm->pm_pml4[$i] & $PG_U) != $last
 	    printf "%d-%d: ", $start, $i-1
 	    if $last == 0
-	        printf "<kernel>\n"
+		printf "<kernel>\n"
 	    else
-	        printf "PG_U\n"
+		printf "PG_U\n"
 	    end
 	    set $start = $i
 	    set $last = $_pm->pm_pml4[$i] & $PG_U
 	end
-        set $i = $i + 1
+	set $i = $i + 1
     end
     printf "%d-%d: ", $start, $i-1
     if $last == 0
-        printf "<kernel>\n"
+	printf "<kernel>\n"
     else
-        printf "PG_U\n"
+	printf "PG_U\n"
     end
 end
 
@@ -297,16 +297,16 @@ define pmap_checkdmap_pgu
     set $pm = &kernel_pmap_store
     set $va = (uint64_t)&dmapbase
     while ($va < &dmaplimit)
-        pmap_pdpe $pm $va $_pdpe
-        if ($_pdpe & ($PG_V | $PG_U)) == ($PG_V | $PG_U)
+	pmap_pdpe $pm $va $_pdpe
+	if ($_pdpe & ($PG_V | $PG_U)) == ($PG_V | $PG_U)
 	    printf "%p: PG_V | PG_U", $va
 	    if ($_pdpe & $PG_PS)
-	        printf " | PG_PS (XXX)"
+		printf " | PG_PS (XXX)"
 	    end
 	    printf "\n"
 	else
 	    if $_pdpe & ($PG_PS | $PG_V)
-	        printf "%p: PG_V | PG_PS (ok)\n", $va
+		printf "%p: PG_V | PG_PS (ok)\n", $va
 	    end
 	end
 	set $va = $va + (1024 * 1024 * 1024)
