@@ -2694,12 +2694,20 @@ end
 
 define inaddr
     set $_ie = &((struct inpcb *)$arg0)->inp_inc.inc_ie
-    set $_ip = &$_ie->ie_dependladdr.ie46_local.ia46_addr4
+    if (osreldate >= 1200067)
+        set $_ip = &$_ie->ie_dependladdr.id46_addr.ia46_addr4
+    else
+        set $_ip = &$_ie->ie_dependladdr.ie46_local.ia46_addr4
+    end
     print_ip $_ip
     printf ":"
     print_port $_ie.ie_lport 
     printf " -> "
-    set $_ip = &$_ie->ie_dependfaddr.ie46_foreign.ia46_addr4
+    if (osreldate >= 1200067)
+        set $_ip = &$_ie->ie_dependfaddr.id46_addr.ia46_addr4
+    else
+        set $_ip = &$_ie->ie_dependfaddr.ie46_foreign.ia46_addr4
+    end
     print_ip $_ip
     printf ":"
     print_port $_ie.ie_fport
