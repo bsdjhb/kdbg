@@ -480,7 +480,7 @@ define eq_msg
 	printf " UEQ"
     end
     if ($_wr_op == $FW_ULPTX_WR)
-	set $_wr = (struct fw_ulptx_wr *)$_hdr
+	#set $_wr = (struct fw_ulptx_wr *)$_hdr
 	printf " ULPTX"
 	# not a CPL, would have to parse ULPTX
     end
@@ -524,6 +524,20 @@ define eq_msgs
 	    set $_idx = $_idx + 1
 	else
 	    set $_idx = $_idx + ($_len16 + 3) / 4
+	end
+    end
+end
+
+# <eq> <start> <count>
+define eq_msgs_raw
+    set $_idx = $arg1
+    set $_count = $arg2
+    while ($_count-- > 0)
+	eq_msg_raw $arg0 $_idx
+        if ($_idx < $arg0->sidx - 1)
+	    set $_idx = $_idx + 1
+	else
+	    set $_idx = 0
 	end
     end
 end
