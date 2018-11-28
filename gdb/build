@@ -87,8 +87,20 @@ elif [ -n "${CHERI_MIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     : ${ROOTFS:="/home/john/work/cheri/rootfs"}
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd12.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
+    LDFLAGS="-fuse-ld=lld"
+    EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
+    EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${CHERI128_MIPS}" ]; then
+    obj=obj.cheri128
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
     LDFLAGS="-fuse-ld=lld"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
@@ -164,6 +176,8 @@ elif [ -n "${XARM}" ]; then
 elif [ -n "${XRISCV64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
 elif [ -n "${CHERI_MIPS}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
+elif [ -n "${CHERI128_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
 
