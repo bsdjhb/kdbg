@@ -314,7 +314,7 @@ while [ 1 ]; do
 	nextslot=$(($nextslot + 1))
 
 	${FBSDRUN} -c ${cpus} -m ${memsize} ${bhyverun_opt}		\
-		-g ${gdbport}						\
+		-G ${gdbport}						\
 		-s 0:0,hostbridge					\
 		-s 1:0,lpc						\
 		${devargs}						\
