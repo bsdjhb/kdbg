@@ -135,6 +135,15 @@ elif [ -n "${XRISCV64}" ]; then
     CXX="riscv64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+elif [ -n "${XPPC64}" ]; then
+    obj=obj.powerpc64
+    PYTHON=""
+    PYTHON_CFG="--without-python"
+    : ${ROOTFS:="/qemu/ppc64/rootfs"}
+    CC="powerpc64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
+    CXX="powerpc64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 else
     CC="cc"
     CXX="c++"
@@ -175,6 +184,8 @@ elif [ -n "${XARM}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=arm-gnueabi-freebsd --without-expat"
 elif [ -n "${XRISCV64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
+elif [ -n "${XPPC64}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=powerpc64-freebsd --without-expat"
 elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 elif [ -n "${CHERI128_MIPS}" ]; then
