@@ -586,6 +586,9 @@ end
 
 define queues_vi_helper
     printf "%s: queues:\n", $arg0->ifp->if_xname
+    if ($arg0 == $arg0->pi->vi)
+	printf "  ctrlq: %p\n", $arg0->pi->adapter->sge.ctrlq + $arg0->pi->port_id
+    end
     set $i = 0
     while ($i < $arg0->nrxq)
 	printf "  rxq %d: %p\n", $i, $arg0->pi->adapter->sge.rxq + $arg0->first_rxq + $i
