@@ -16,10 +16,6 @@ case $arch in
 		;;
 esac
 
-datadir=`ls -d /usr/local/share/gdb* 2>/dev/null | head -1`
-if [ -z "$sharedir" ]; then
-    datadir=/usr/local/share/gdb
-fi
 if [ -x /usr/local/bin/python2.7 -a -z "${WITHOUT_PYTHON}" ]; then
     PYTHON="/usr/local/bin/python2.7"
     PYTHON_CFG="--with-python=${PYTHON}"
@@ -166,7 +162,7 @@ mkdir $obj
 
 # Next, run configure
 CONFIGURE_ARGS="--enable-targets=all \
---with-gdb-datadir=${datadir} --with-separate-debug-dir=/usr/lib/debug \
+--with-separate-debug-dir=/usr/lib/debug \
 --without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui \
 --prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} \
