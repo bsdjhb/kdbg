@@ -83,8 +83,9 @@ elif [ -n "${CHERI_MIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     : ${ROOTFS:="/home/john/work/cheri/rootfs"}
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float -mstack-alignment=32"
+    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=32 -cheri=256 -mabi=64"
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
     LDFLAGS="-fuse-ld=lld"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
@@ -95,8 +96,9 @@ elif [ -n "${CHERI128_MIPS}" ]; then
     PYTHON=""
     PYTHON_CFG="--without-python"
     : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
+    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=64"
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
     LDFLAGS="-fuse-ld=lld"
     EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
