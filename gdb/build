@@ -192,9 +192,9 @@ fi
 
 (cd $obj;
  env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
-     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing -std=gnu89" \
+     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing" \
      CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" \
-     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -DLIBICONV_PLUG -g -fno-strict-aliasing" \
+     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing" \
      LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS="" \
      INSTALL="/usr/bin/install -c " \
      INSTALL_DATA="install   -m 0644" \
