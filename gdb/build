@@ -16,8 +16,8 @@ case $arch in
 		;;
 esac
 
-if [ -x /usr/local/bin/python2.7 -a -z "${WITHOUT_PYTHON}" ]; then
-    PYTHON="/usr/local/bin/python2.7"
+if [ -x /usr/local/bin/python -a -z "${WITHOUT_PYTHON}" ]; then
+    PYTHON="/usr/local/bin/python"
     PYTHON_CFG="--with-python=${PYTHON}"
 else
     PYTHON=""
@@ -34,26 +34,28 @@ if [ -n "${WITH_GCC}" ]; then
 elif [ -n "${XMIPS}" ]; then
     obj=obj.mips
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XCMIPS}" ]; then
     obj=obj.mips
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
     CCDIR="/usr/obj/mips.mips/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
     CC="${CCDIR}/cc -target mips-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
     CXX="${CCDIR}/c++ -target mips-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XMIPSN32}" ]; then
     obj=obj.mipsn32
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
@@ -62,16 +64,17 @@ elif [ -n "${XMIPSN32}" ]; then
 elif [ -n "${XMIPS64}" ]; then
     obj=obj.mips64
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
     CC="mips-unknown-freebsd${version}-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     CXX="mips-unknown-freebsd${version}-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XCMIPS64}" ]; then
     obj=obj.mips64
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
     CCDIR="/usr/obj/mips.mips64/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
     CC="${CCDIR}/cc -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
@@ -81,7 +84,7 @@ elif [ -n "${XCMIPS64}" ]; then
 elif [ -n "${CHERI_MIPS}" ]; then
     obj=obj.cheri
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/cheri/rootfs"}
     CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=32 -cheri=256 -mabi=64"
     CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
@@ -94,7 +97,7 @@ elif [ -n "${CHERI_MIPS}" ]; then
 elif [ -n "${CHERI128_MIPS}" ]; then
     obj=obj.cheri128
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
     CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=64"
     CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
@@ -107,36 +110,39 @@ elif [ -n "${CHERI128_MIPS}" ]; then
 elif [ -n "${XAARCH64}" ]; then
     obj=obj.aarch64
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/mnt"}
     LDFLAGS="-fuse-ld=lld"
     CC="clang -target aarch64-freebsd13.0 --sysroot=${ROOTFS}"
     CXX="clang++ -target aarch64-freebsd13.0 --sysroot=${ROOTFS}"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XARM}" ]; then
     obj=obj.arm
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/mnt"}
     LDFLAGS="-fuse-ld=lld"
-    CC="clang -target armv6-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
-    CXX="clang++ -target armv6-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
+    CC="clang -target armv7-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
+    CXX="clang++ -target armv7-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XRISCV64}" ]; then
     obj=obj.riscv64
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/ufs/riscv64/rootfs"}
     CC="riscv64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
     CXX="riscv64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=riscv64-unknown-freebsd${version}-ar"
 elif [ -n "${XPPC64}" ]; then
     obj=obj.powerpc64
     PYTHON=""
-    PYTHON_CFG="--without-python"
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/qemu/ppc64/rootfs"}
     CC="powerpc64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
     CXX="powerpc64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
