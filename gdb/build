@@ -94,6 +94,7 @@ elif [ -n "${CHERI_MIPS}" ]; then
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${CHERI128_MIPS}" ]; then
     obj=obj.cheri128
     PYTHON=""
@@ -107,6 +108,7 @@ elif [ -n "${CHERI128_MIPS}" ]; then
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XAARCH64}" ]; then
     obj=obj.aarch64
     PYTHON=""
