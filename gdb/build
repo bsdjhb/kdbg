@@ -24,9 +24,12 @@ else
     PYTHON_CFG="--without-python"	
 fi
 
+GDB_DIR=${PWD}
 LDFLAGS=
 CONFIGURE_ENV=
-if [ -n "${WITH_GCC}" ]; then
+if [ -n "${CONFIG}" ]; then
+	. ${CONFIG}
+elif [ -n "${WITH_GCC}" ]; then
     CC="${WITH_GCC}"
     CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
     WERROR=""
@@ -229,4 +232,4 @@ fi
      PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh \
      CONFIG_SITE=/usr/ports/Templates/config.site \
      lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} \
-     ../configure ${CONFIGURE_ARGS} )
+     ${GDB_DIR}/configure ${CONFIGURE_ARGS} ${CONFIGURE_ARGS_APPEND} )
