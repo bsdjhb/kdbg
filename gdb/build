@@ -109,6 +109,20 @@ elif [ -n "${CHERI128_MIPS}" ]; then
     WERROR="--disable-werror"
     CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
     CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
+elif [ -n "${CHERIABI128}" ]; then
+    obj=obj.cheriabi128
+    PYTHON=""
+    PYTHON_CFG="--without-python --disable-source-highlight"
+    : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
+    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=purecap -cheri-cap-table-abi=pcrel -mxcaptable"
+    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
+    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
+    LDFLAGS="-fuse-ld=lld"
+    EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
+    EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
 elif [ -n "${XAARCH64}" ]; then
     obj=obj.aarch64
     PYTHON=""
@@ -195,6 +209,8 @@ elif [ -n "${XPPC64}" ]; then
 elif [ -n "${CHERI_MIPS}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 elif [ -n "${CHERI128_MIPS}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
+elif [ -n "${CHERIABI128}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
 fi
 
