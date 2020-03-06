@@ -2121,7 +2121,7 @@ define print_file
     file_type $arg0
     if ($arg0->f_data == 0)
 	set $foo = $PTRWIDTH - 3
-	space $foo
+	spaces $foo
     end
     printf " %p %08x %5d %p\n", $arg0->f_data, $arg0->f_flag, \
 	$arg0->f_count, $arg0->f_vnode
