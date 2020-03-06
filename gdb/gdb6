@@ -141,6 +141,12 @@ set $CTLTYPE_NODE = 1
 
 set $M_EXT = 0x0001
 set $M_PKTHDR = 0x0002
+set $M_EOR = 0x0004
+set $M_NOMAP = 0x0100
+set $M_PROTO1 = 0x2000
+set $M_PROTO2 = 0x4000
+set $M_NOTREADY = $M_PROTO1
+set $M_BLOCKED = $M_PROTO2
 
 set $IPPROTO_IP = 0
 set $IPPROTO_ICMP = 1
@@ -1889,9 +1895,24 @@ define lspci
     end
 end
 
+define mbuf_flags
+    set $_comma = 0
+    print_flag $arg0 $M_EXT "EXT" "|"
+    print_flag $arg0 $M_PKTHDR "PKTHDR" "|"
+    print_flag $arg0 $M_EOR "EOR" "|"
+    print_flag $arg0 $M_NOMAP "NOMAP" "|"
+    print_flag $arg0 $M_NOTREADY "NOTREADY" "|"
+    print_flag $arg0 $M_BLOCKED "BLOCKED" "|"
+    if ($_comma)
+	printf " "
+    end
+end
+
 # Print a single mbuf
 define dumpmbuf_10
-    printf "%p: %d bytes", $arg0, $arg0->m_hdr.mh_len
+    printf "%p: ", $arg0
+    mbuf_flags $arg0->m_hdr.mh_flags
+    printf "%d bytes", $arg0->m_hdr.mh_len
     if ($arg0->m_hdr.mh_flags & $M_EXT)
 	printf " ext %p", $arg0->M_dat.MH.MH_dat.MH_ext.ext_buf
     end
@@ -1906,7 +1927,9 @@ define dumpmbuf_10
 end
 
 define dumpmbuf_11
-    printf "%p: %d bytes", $arg0, $arg0->m_len
+    printf "%p: ", $arg0
+    mbuf_flags $arg0->m_flags
+    printf "%d bytes", $arg0->m_len
     if ($arg0->m_flags & $M_EXT)
 	printf " ext %p", $arg0->m_ext.ext_buf
     end
@@ -1958,17 +1981,39 @@ Display all the mbufs in an mbuf chain.
 end
 
 # Dump a list of packets
-define packets
+define packets_10
     set $mp = (struct mbuf *)$arg0
     while ($mp != 0)
 	printf "chain %p:\n", $mp
 	set $m = $mp
 	while ($m != 0)
 		printf "  "
-	 	dumpmbuf $m
+	 	dumpmbuf_10 $m
 		set $m = $m->m_hdr.mh_next
 	end
 	set $mp = $mp->m_hdr.mh_nextpkt
+    end
+end
+
+define packets_11
+    set $mp = (struct mbuf *)$arg0
+    while ($mp != 0)
+	printf "chain %p:\n", $mp
+	set $m = $mp
+	while ($m != 0)
+		printf "  "
+	 	dumpmbuf_11 $m
+		set $m = $m->m_next
+	end
+	set $mp = $mp->m_nextpkt
+    end
+end
+
+define packets
+    if ($osrelease >= 11)
+	packets_11 $arg0
+    else
+	packets_10 $arg0
     end
 end
 
