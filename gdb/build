@@ -152,6 +152,17 @@ elif [ -n "${XRISCV64}" ]; then
     obj=obj.riscv64
     PYTHON=""
     PYTHON_CFG="--without-python --disable-source-highlight"
+    : ${ROOTFS:="/home/john/work/qemu/riscv64/rootfs"}
+    CCDIR="/usr/obj/usr/home/john/work/git/freebsd/riscv.riscv64/tmp/usr/bin"
+    CC="${CCDIR}/cc -target riscv64-freebsd13.0 -march=rv64imafdc -mabi=lp64d -mno-relax --sysroot=${ROOTFS} -B ${CCDIR}"
+    CXX="${CCDIR}/c++ -target riscv64-freebsd13.0 -march=rv64imafdc -mabi=lp64d -mno-relax --sysroot=${ROOTFS} -B ${CCDIR}"
+    WERROR="--disable-werror"
+    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=riscv64-unknown-freebsd${version}-ar"
+elif [ -n "${XRISCV64_GCC}" ]; then
+    obj=obj.riscv64
+    PYTHON=""
+    PYTHON_CFG="--without-python --disable-source-highlight"
     : ${ROOTFS:="/ufs/riscv64/rootfs"}
     CC="riscv64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
     CXX="riscv64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
@@ -205,6 +216,8 @@ elif [ -n "${XAARCH64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=aarch64-freebsd --without-expat"
 elif [ -n "${XARM}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=arm-gnueabi-freebsd --without-expat"
+elif [ -n "${XRISCV64_GCC}" ]; then
+    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
 elif [ -n "${XRISCV64}" ]; then
     CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
 elif [ -n "${XPPC64}" ]; then
