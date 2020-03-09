@@ -88,7 +88,7 @@ elif [ -n "${CHERI_MIPS}" ]; then
     obj=obj.cheri
     PYTHON=""
     PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/cheri/rootfs"}
+    : ${ROOTFS:="/home/john/work/cheri/mips/rootfs"}
     CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=32 -cheri=256 -mabi=64"
     CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
     CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
@@ -102,7 +102,7 @@ elif [ -n "${CHERI128_MIPS}" ]; then
     obj=obj.cheri128
     PYTHON=""
     PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
+    : ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
     CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=64"
     CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
     CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
