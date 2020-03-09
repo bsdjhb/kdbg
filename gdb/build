@@ -2,235 +2,300 @@
 #
 # Setup a build env and build gdb similar to how ports builds it
 
-# Figure out some variables
+usage()
+{
+	cat <<EOF
+usage: build [-g gcc|-G] [-r sysroot] [-s gdbdir] -f config file
+       build [-g gcc|-G] [-r sysroot] [-s gdbdir] [config]
+
+       -f: path to a config file
+       -g: gcc compiler to use
+       -G: pick a default GCC for the config
+       -r: path to a sysroot (defaults to / for native)
+       -s: path to GDB source (defaults to pwd)
+       config: built in configuration, native if none given
+EOF
+	exit 1
+}
+
+GDB_DIR=${PWD}
+while getopts "f:Gg:r:s" option; do
+	case "$option" in
+		f)
+			config="$OPTARG"
+			;;
+		G)
+			USE_GCC=yes
+			;;
+		g)
+			WITH_GCC="$OPTARG"
+			;;
+		r)
+			ROOTFS="$OPTARG"
+			;;
+		s)
+			GDB_DIR="$OPTARG"
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# Check for invalid arguments
+if [ $# -gt 1 ]; then
+	usage
+fi
+
+if [ $# -eq 1 -a -n "$config" ]; then
+	usage
+fi
+
+if [ -n "$USE_GCC" -a -n "$WITH_GCC" ]; then
+	usage
+fi
+	
+# Figure out some variables and set some defaults
 version=`uname -r | cut -d- -f1`
 arch=`uname -m`
 case $arch in
 	amd64)
 		cfgarch=x86_64
-		obj=obj
 		;;
 	*)
 		cfgarch=${arch}
-		obj=obj.${arch}
 		;;
 esac
 
-if [ -x /usr/local/bin/python -a -z "${WITHOUT_PYTHON}" ]; then
-    PYTHON="/usr/local/bin/python"
-    PYTHON_CFG="--with-python=${PYTHON}"
+# Cross-compile configurations should set this to the triple
+# to pass to --host
+HOST=
+
+CONFIGURE_ARGS=
+CONFIGURE_ENV=
+LDFLAGS=
+PYTHON=
+
+if [ -n "${WITH_GCC}" ]; then
+	CC="${WITH_GCC}"
+	CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
 else
-    PYTHON=""
-    PYTHON_CFG="--without-python"	
+	CC="cc"
+	CXX="c++"
 fi
 
-GDB_DIR=${PWD}
-LDFLAGS=
-CONFIGURE_ENV=
-if [ -n "${CONFIG}" ]; then
-	. ${CONFIG}
-elif [ -n "${WITH_GCC}" ]; then
-    CC="${WITH_GCC}"
-    CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
-    WERROR=""
-    obj=${obj}.gcc
-elif [ -n "${XMIPS}" ]; then
-    obj=obj.mips
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
-    CC="mips-unknown-freebsd${version}-gcc --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd${version}-g++ --sysroot=${ROOTFS} -msoft-float"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XCMIPS}" ]; then
-    obj=obj.mips
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
-    CCDIR="/usr/obj/mips.mips/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
-    CC="${CCDIR}/cc -target mips-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
-    CXX="${CCDIR}/c++ -target mips-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XMIPSN32}" ]; then
-    obj=obj.mipsn32
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
-    CC="mips-unknown-freebsd${version}-gcc -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd${version}-g++ -mabi=n32 --sysroot=${ROOTFS} -msoft-float"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-elif [ -n "${XMIPS64}" ]; then
-    obj=obj.mips64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
-    CC="mips-unknown-freebsd${version}-gcc -mabi=64 --sysroot=${ROOTFS} -msoft-float"
-    CXX="mips-unknown-freebsd${version}-g++ -mabi=64 --sysroot=${ROOTFS} -msoft-float"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XCMIPS64}" ]; then
-    obj=obj.mips64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
-    CCDIR="/usr/obj/mips.mips64/usr/home/john/work/git/mips_xbuild/tmp/usr/bin"
-    CC="${CCDIR}/cc -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
-    CXX="${CCDIR}/c++ -march=mips4 -integrated-as -target mips64-freebsd13.0 --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin -msoft-float"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-elif [ -n "${CHERI_MIPS}" ]; then
-    obj=obj.cheri
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/cheri/mips/rootfs"}
-    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=32 -cheri=256 -mabi=64"
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    LDFLAGS="-fuse-ld=lld -Wl,--gdb-index"
-    EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
-    EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${CHERI128_MIPS}" ]; then
-    obj=obj.cheri128
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
-    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=64"
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    LDFLAGS="-fuse-ld=lld -Wl,--gdb-index"
-    EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
-    EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${CHERIABI128}" ]; then
-    obj=obj.cheriabi128
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/cheri/rootfs128"}
-    CHERI_FLAGS="-target cheri-freebsd13.0 -msoft-float -mstack-alignment=16 -cheri=128 -mabi=purecap -cheri-cap-table-abi=pcrel -mxcaptable"
-    CC="/usr/cheri/bin/clang -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    CXX="/usr/cheri/bin/clang++ -march=mips4 -integrated-as --sysroot=${ROOTFS} -B /usr/local/mips-freebsd/bin ${CHERI_FLAGS}"
-    LDFLAGS="-fuse-ld=lld -Wl,--gdb-index"
-    EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
-    EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XAARCH64}" ]; then
-    obj=obj.aarch64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/mnt"}
-    LDFLAGS="-fuse-ld=lld"
-    CC="clang -target aarch64-freebsd13.0 --sysroot=${ROOTFS}"
-    CXX="clang++ -target aarch64-freebsd13.0 --sysroot=${ROOTFS}"
-    LDFLAGS="-Wl,--gdb-index"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XARM}" ]; then
-    obj=obj.arm
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/mnt"}
-    LDFLAGS="-fuse-ld=lld"
-    CC="clang -target armv7-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
-    CXX="clang++ -target armv7-gnueabihf-freebsd13.0 --sysroot=${ROOTFS}"
-    LDFLAGS="-Wl,--gdb-index"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=/usr/bin/ar"
-elif [ -n "${XRISCV64}" ]; then
-    obj=obj.riscv64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/home/john/work/qemu/riscv64/rootfs"}
-    CCDIR="/usr/obj/usr/home/john/work/git/freebsd/riscv.riscv64/tmp/usr/bin"
-    CC="${CCDIR}/cc -target riscv64-freebsd13.0 -march=rv64imafdc -mabi=lp64d -mno-relax --sysroot=${ROOTFS} -B ${CCDIR}"
-    CXX="${CCDIR}/c++ -target riscv64-freebsd13.0 -march=rv64imafdc -mabi=lp64d -mno-relax --sysroot=${ROOTFS} -B ${CCDIR}"
-    LDFLAGS="-Wl,--gdb-index"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=riscv64-unknown-freebsd${version}-ar"
-elif [ -n "${XRISCV64_GCC}" ]; then
-    obj=obj.riscv64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/ufs/riscv64/rootfs"}
-    CC="riscv64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
-    CXX="riscv64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=riscv64-unknown-freebsd${version}-ar"
-elif [ -n "${XPPC64}" ]; then
-    obj=obj.powerpc64
-    PYTHON=""
-    PYTHON_CFG="--without-python --disable-source-highlight"
-    : ${ROOTFS:="/qemu/ppc64/rootfs"}
-    CC="powerpc64-unknown-freebsd${version}-gcc --sysroot=${ROOTFS}"
-    CXX="powerpc64-unknown-freebsd${version}-g++ --sysroot=${ROOTFS}"
-    WERROR="--disable-werror"
-    CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+if [ -n "$config" ]; then
+	if ! [ -r "$config" ]; then
+		echo "Can't read config file"
+		exit 1
+	fi
+	. ${config}
+	config=
+elif [ $# -eq 1 ]; then
+	case "$1" in
+		mips)
+			obj=obj.mips
+			: ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
+			HOST=mips-freebsd
+			CLANG_TARGET=mips-freebsd13.0
+			CC_FLAGS="-msoft-float -mabi=32"
+			if [ -n ${USE_GCC} ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+				AR=/usr/bin/ar
+			fi
+			;;
+		mipsn32)
+			obj=obj.mipsn32
+			: ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips-freebsd13.0-xxx
+			CC_FLAGS="-msoft-float -mabi=n32"
+			if [ -n ${USE_GCC} ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+			fi
+			;;
+		mips64)
+			obj=obj.mips64
+			: ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips64-freebsd13.0
+			CC_FLAGS="-msoft-float -mabi=64"
+			if [ -n ${USE_GCC} ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+				AR=/usr/bin/ar
+			fi
+			;;
+		cheri256)
+			obj=obj.cheri
+			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=cheri-freebsd13.0
+			# -march=mips4?
+			CC_FLAGS="-msoft-float -mstack-alignment=32 \
+-cheri=256 -mabi=64 -B /usr/local/mips-freebsd/bin"
+			CC="/usr/cheri/bin/clang"
+			CXX="/usr/cheri/bin/clang++"
+			AR=/usr/bin/ar
+			;;
+		cheri128)
+			obj=obj.cheri128
+			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=cheri-freebsd13.0
+			# -march=mips4?
+			CC_FLAGS="-msoft-float -mstack-alignment=16 \
+-cheri=128 -mabi=64 -B /usr/local/mips-freebsd/bin"
+			CC="/usr/cheri/bin/clang"
+			CXX="/usr/cheri/bin/clang++"
+			AR=/usr/bin/ar
+			;;
+		mips64c)
+			obj=obj.cheriabi128
+			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=cheri-freebsd13.0
+			CC_FLAGS="-msoft-float -mstack-alignment=16 \
+-cheri=128 -mabi=purecap -cheri-cap-table-abi=pcrel -mxcaptable \
+-B /usr/local/mips-freebsd/bin"
+			CC="/usr/cheri/bin/clang"
+			CXX="/usr/cheri/bin/clang++"
+			AR=/usr/bin/ar
+			;;
+		aarch64)
+			obj=obj.aarch64
+			: ${ROOTFS:="/mnt"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd13.0
+			AR=/usr/bin/ar
+			;;
+		armv7)
+			obj=obj.arm
+			: ${ROOTFS:="/mnt"}
+			HOST=arm-gnueabi-freebsd
+			CLANG_TARGET=armv7-gnueabihf-freebsd13.0
+			AR=/usr/bin/ar
+			;;
+		riscv64)
+			obj=obj.riscv64
+			: ${ROOTFS:="/home/john/work/qemu/riscv64/rootfs"}
+			HOST=riscv64-freebsd
+			CLANG_TARGET=riscv64-freebsd13.0
+			CC_FLAGS="-march=rv64imafdc -mabi=lp64d"
+			CLANG_CC_FLAGS="-mno-relax"
+			if [ -n ${USE_GCC} ]; then
+				CC="riscv64-unknown-freebsd${version}-gcc"
+				CXX="riscv64-unknown-freebsd${version}-g++"
+			fi
+			AR="riscv64-unknown-freebsd${version}-ar"
+			;;
+		powerpc64)
+			obj=obj.powerpc64
+			: ${ROOTFS:="/qemu/ppc64/rootfs"}
+			HOST=powerpc64-freebsd
+			CLANG_TARGET=powerpc64-freebsd13.0
+			if [ -n ${USE_GCC} ]; then
+				CC="powerpc64-unknown-freebsd${version}-gcc"
+				CXX="powerpc64-unknown-freebsd${version}-g++"
+			fi
+			;;
+		*)
+			echo "Unknown configuration"
+			exit 1
+			;;
+	esac
 else
-    CC="cc"
-    CXX="c++"
-    if [ -x /usr/bin/clang -a /usr/bin/clang -ef /usr/bin/cc ]; then
+	case $arch in
+		amd64)
+			obj=obj
+			;;
+		*)
+			obj=obj.${arch}
+			;;
+	esac
+	if [ -n "$WITH_GCC" ]; then
+		obj=${obj}.gcc
+		WANT_WERROR=yes
+	fi
+	if [ -n "$USE_GCC" ]; then
+		echo "native doesn't support implicit gcc via -G"
+		exit 1
+	fi
+
+	if [ -x /usr/local/bin/python -a -z "${WITHOUT_PYTHON}" ]; then
+		PYTHON="/usr/local/bin/python"
+	fi
+fi
+
+cc_version=`${CC} -v 2>&1`
+if [ $? -ne 0 ]; then
+	echo "Compilers are not executable:"
+	echo " CC=${CC}"
+	echo " CXX=${CXX}"
+	exit 1
+fi
+
+if echo "${cc_version}" | grep -q clang ; then
 	# clang-specific warnings to disable
 	EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
 	EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
-    fi
-    WERROR="--disable-werror"
+
+	if [ -n "${CLANG_TARGET}" ]; then
+		CC_FLAGS="-target ${CLANG_TARGET} ${CC_FLAGS}"
+	fi
+	CC_FLAGS="${CC_FLAGS} ${CLANG_CC_FLAGS}"
+	: ${LDFLAGS:="-fuse-ld=lld -Wl,--gdb-index"}
+fi
+if [ -n "${ROOTFS}" ]; then
+	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
+fi
+CC="${CC} ${CC_FLAGS}"
+CXX="${CXX} ${CC_FLAGS}"
+
+if [ -n "${AR}" ]; then
+    CONFIGURE_ENV="${CONFIGURE_ENV} AR=${AR}"
 fi
 
 if [ -n "${WITH_UBSAN}" ]; then
-    UBSAN_CFG="--enable-ubsan"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --enable-ubsan"
 else
-    UBSAN_CFG="--disable-ubsan"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-ubsan"
 fi
 
+if [ -n "${PYTHON}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-python=${PYTHON}"
+else
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --without-python"	
+fi
+
+if [ -n "${HOST}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --without-expat"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-source-highlight"
+	CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+else
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-expat"
+fi
+
+if [ -z "${WANT_WERROR}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-werror"
+fi
+	
 # First, make an obj tree
 mkdir $obj
 
 # Next, run configure
 CONFIGURE_ARGS="--enable-targets=all \
 --with-separate-debug-dir=/usr/lib/debug \
---without-libunwind-ia64 --with-expat ${PYTHON_CFG} --enable-tui \
+--without-libunwind-ia64 --enable-tui \
 --prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ \
---build=${cfgarch}-portbld-freebsd${version} --disable-nls ${WERROR} \
---disable-ld --enable-64-bit-bfd ${UBSAN_CFG}"
+--build=${cfgarch}-portbld-freebsd${version} --disable-nls \
+--disable-ld --enable-64-bit-bfd ${CONFIGURE_ARGS}"
 
-if [ -n "${XMIPS}" -o -n "${XCMIPS}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips-freebsd --without-expat"
-elif [ -n "${XMIPSN32}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
-elif [ -n "${XMIPS64}" -o -n "${XCMIPS64}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
-elif [ -n "${XAARCH64}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=aarch64-freebsd --without-expat"
-elif [ -n "${XARM}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=arm-gnueabi-freebsd --without-expat"
-elif [ -n "${XRISCV64_GCC}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
-elif [ -n "${XRISCV64}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=riscv64-freebsd --without-expat"
-elif [ -n "${XPPC64}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=powerpc64-freebsd --without-expat"
-elif [ -n "${CHERI_MIPS}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
-elif [ -n "${CHERI128_MIPS}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
-elif [ -n "${CHERIABI128}" ]; then
-    CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=mips64-freebsd --without-expat"
+if [ -n "${HOST}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=${HOST}"
 fi
 
 (cd $obj;
@@ -248,4 +313,4 @@ fi
      PYTHON="${PYTHON}" SHELL=/bin/sh CONFIG_SHELL=/bin/sh \
      CONFIG_SITE=/usr/ports/Templates/config.site \
      lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} \
-     ${GDB_DIR}/configure ${CONFIGURE_ARGS} ${CONFIGURE_ARGS_APPEND} )
+     ${GDB_DIR}/configure ${CONFIGURE_ARGS} )
