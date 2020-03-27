@@ -1388,7 +1388,7 @@ Like lockchain but for sleep locks
 end
 
 # sysctl_oid name namelen
-def sysctl_oid
+define sysctl_oid
     set $oid = sysctl__children.slh_first
     set $index = 0
     while ($oid != 0 && $index < $arg1)
@@ -1415,7 +1415,7 @@ Try to lookup the name of a sysctl OID.
 end
 
 # sysctl_nodes list
-def sysctl_nodes
+define sysctl_nodes
     if ($arg0 == 0)
 	set $oid = sysctl__children.slh_first
     else
@@ -1432,7 +1432,7 @@ List the immediate children of a sysctl node.  Use a node of '0' to start
 from the top of the tree.
 end
 
-def memstat
+define memstat
     printf "%8d K Active (%2d%c)\n", cnt.v_active_count * cnt.v_page_size / \
 	1024, cnt.v_active_count * 100 / cnt.v_page_count, '%'
     printf "%8d K Inact  (%2d%c)\n", cnt.v_inactive_count * cnt.v_page_size / \
@@ -1455,7 +1455,7 @@ set $BLIST_BMAP_RADIX = (sizeof(u_daddr_t)*8)
 
 # Evil nested versions of blst_radix_print to allow for "recursion" as a
 # workaround for the lack of local variables in gdb.
-def blst_radix_print_6
+define blst_radix_print_6
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1477,7 +1477,7 @@ def blst_radix_print_6
     end
 end
 
-def blst_radix_print_5
+define blst_radix_print_5
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1519,7 +1519,7 @@ def blst_radix_print_5
     end
 end
 
-def blst_radix_print_4
+define blst_radix_print_4
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1561,7 +1561,7 @@ def blst_radix_print_4
     end
 end
 
-def blst_radix_print_3
+define blst_radix_print_3
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1603,7 +1603,7 @@ def blst_radix_print_3
     end
 end
 
-def blst_radix_print_2
+define blst_radix_print_2
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1645,7 +1645,7 @@ def blst_radix_print_2
     end
 end
 
-def blst_radix_print_1
+define blst_radix_print_1
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1692,7 +1692,7 @@ end
 # $arg2 - radix
 # $arg3 - skip
 # $arg4 - tab
-def blst_radix_print
+define blst_radix_print
     spaces $arg4
     printf "(%08llx,%lld): ", $arg1, $arg2
     if ($arg2 == $BLIST_BMAP_RADIX)
@@ -1733,13 +1733,13 @@ def blst_radix_print
     end
 end
 
-def blist
+define blist
     printf "BLIST {\n"
     blst_radix_print $arg0->bl_root 0 $arg0->bl_radix $arg0->bl_skip 4
     printf "}\n"
 end
 
-def blists
+define blists
     set $swp = swtailq.tqh_first
     while ($swp != 0)
 	if ($swp->sw_dev == 0)
@@ -1752,7 +1752,7 @@ def blists
     end
 end
 
-def swapinfo
+define swapinfo
     printf "Device          1K-blocks     Used    Avail Capacity\n"
     set $swp = swtailq.tqh_first
     while ($swp != 0)
