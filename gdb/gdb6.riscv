@@ -22,6 +22,8 @@ set $Ln_ADDR_MASK = ($Ln_ENTRIES - 1)
 
 set $PAGE_SIZE = $L3_SIZE
 
+set $PTE_SC = 0x8000000000000000
+set $PTE_LC = 0x4000000000000000
 set $PTE_D = 0x80
 set $PTE_A = 0x40
 set $PTE_G = 0x20
@@ -32,6 +34,7 @@ set $PTE_R = 0x02
 set $PTE_V = 0x01
 set $PTE_RX = ($PTE_R | $PTE_X)
 set $PTE_RWX = ($PTE_R | $PTE_W | $PTE_X)
+set $PTE_PERMS = ($PTE_RWX | $PTE_LC | $PTE_SC)
 
 set $PTE_PPN0_S = 10
 set $PTE_PPN1_S = 19
@@ -162,6 +165,16 @@ define pmap_perms_print
 	else
 	    printf "-"
 	end
+	if ($perms & $PTE_LC)
+	    printf "L"
+	else
+	    printf "-"
+	end
+	if ($perms & $PTE_SC)
+	    printf "S"
+	else
+	    printf "-"
+	end
 	printf "\n"
     end
     set $start = -1
@@ -171,10 +184,10 @@ define pmap_perms_l3
     if (($l3e & $PTE_V) == 0)
 	pmap_perms_print
     else
-	if ($start == -1 || ($l3e & $PTE_RWX) != $perms)
+	if ($start == -1 || ($l3e & $PTE_PERMS) != $perms)
 	    pmap_perms_print
 	    set $start = $va
-	    set $perms = $l3e & $PTE_RWX
+	    set $perms = $l3e & $PTE_PERMS
 	end
 	set $end = $va + ($L3_SIZE - 1)
     end
@@ -187,10 +200,10 @@ define pmap_perms_l2
 	set $va = $va + $L2_SIZE
     else
 	if (($l2e & $PTE_RX) != 0)
-	    if ($start == -1 || ($l2e & $PTE_RWX) != $perms)
+	    if ($start == -1 || ($l2e & $PTE_PERMS) != $perms)
 		pmap_perms_print
 		set $start = $va
-		set $perms = $l2e & $PTE_RWX
+		set $perms = $l2e & $PTE_PERMS
 	    end
 	    set $end = $va + ($L2_SIZE - 1)
 	    set $va = $va + $L2_SIZE
@@ -213,10 +226,10 @@ define pmap_perms_l1
 	set $va = $va + $L1_SIZE
     else
 	if (($l1e & $PTE_RX) != 0)
-	    if ($start == -1 || ($l1e & $PTE_RWX) != $perms)
+	    if ($start == -1 || ($l1e & $PTE_PERMS) != $perms)
 		pmap_perms_print
 		set $start = $va
-		set $perms = $l1e & $PTE_RWX
+		set $perms = $l1e & $PTE_PERMS
 	    end
 	    set $end = $va + ($L1_SIZE - 1)
 	    set $va = $va + $L1_SIZE
@@ -256,7 +269,7 @@ define pmap_dump_perms
 	pmap_perms_print
     end
 end
-      
+
 define pmap_print_pte
     set $_indent = $arg0 * 2
     while ($_indent > 0)
@@ -297,6 +310,16 @@ define pmap_print_pte
 	end
 	if ($arg1 & $PTE_R)
 	    printf "R"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_LC)
+	    printf "L"
+	else
+	    printf "-"
+	end
+	if ($arg1 & $PTE_SC)
+	    printf "S"
 	else
 	    printf "-"
 	end
