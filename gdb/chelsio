@@ -348,6 +348,22 @@ define iq_msg_raw
     end
 end
 
+define decode_dump
+    set $_base = (char *)$arg0
+    set $_offset = 0
+    while ($_offset < $arg1)
+	printf "%02x ", ((unsigned)*$_base) & 0xff
+	set $_offset = $_offset + 1
+	set $_base = $_base + 1
+	if ($_offset % 16 == 0)
+	    printf "\n"
+	end
+    end
+    if ($_offset % 16 != 0)
+	printf "\n"
+    end
+end
+
 define intrq
     set $_iq = (struct sge_iq *)$arg0
     printf "cntxt_id: %d  qsize: %d\n", $_iq->cntxt_id, $_iq->qsize
@@ -597,6 +613,16 @@ define queues_vi_helper
     set $i = 0
     while ($i < $arg0->ntxq)
 	printf "  txq %d: %p\n", $i, $arg0->pi->adapter->sge.txq + $arg0->first_txq + $i
+	set $i = $i + 1
+    end
+    set $i = 0
+    while ($i < $arg0->nofldrxq)
+	printf "  ofld_rxq %d: %p\n", $i, $arg0->pi->adapter->sge.ofld_rxq + $arg0->first_ofld_rxq + $i
+	set $i = $i + 1
+    end
+    set $i = 0
+    while ($i < $arg0->nofldtxq)
+	printf "  ofld_txq %d: %p\n", $i, $arg0->pi->adapter->sge.ofld_txq + $arg0->first_ofld_txq + $i
 	set $i = $i + 1
     end
 end
