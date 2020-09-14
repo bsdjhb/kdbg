@@ -173,8 +173,11 @@ set $PTRWIDTH = (sizeof(void *) * 2 + 2)
 
 if (osreldate < 801501)
     set $arch = machine_arch
-else
+else if (osreldate < 1300093)
     set $arch = sysctl_hw_machine_arch::machine_arch
+else
+    # XXX: This assumes the native arch is first
+    set $arch = (char *)((struct sysctl_oid *)__set_sysctl_set_sym_sysctl___kern_supported_archs )->oid_arg1
 end
 
 if ($arch[0] == 'a' && $arch[1] == 'm' && $arch[2] == 'd')
