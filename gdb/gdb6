@@ -3494,53 +3494,81 @@ define print_vmo
     end
 end
 
-define vmmap
+define print_vme
+    if (($arg0->eflags & $MAP_ENTRY_IS_SUB_MAP) == 0)
+	printf "0x%lx - 0x%lx ", $arg0->start, $arg0->end
+	set $_obj = $arg0->object.vm_object
+	printf "%p ", $_obj
+	if ($arg0->protection & $VM_PROT_READ)
+	    printf "r"
+	else
+	    printf "-"
+	end
+	if ($arg0->protection & $VM_PROT_WRITE)
+	    printf "w"
+	else
+	    printf "-"
+	end
+	if ($arg0->protection & $VM_PROT_EXECUTE)
+	    printf "x "
+	else
+	    printf "- "
+	end
+	if ($_obj != 0)
+	    printf "%d %d 0x%x ", $_obj->ref_count, $_obj->shadow_count, \
+		$_obj->flags
+	else
+	    printf "0 0 0x0 "
+	end
+	if ($arg0->eflags & $MAP_ENTRY_COW)
+	    printf "COW "
+	else
+	    printf "!COW "
+	end
+	if ($arg0->eflags & $MAP_ENTRY_NEEDS_COPY)
+	    printf "NC "
+	else
+	    printf "!NC "
+	end
+	print_vmo $_obj
+	printf "\n"
+    end
+end
+
+define vmmap_12
     set $_map = (struct vm_map *)$arg0
     set $_entry = $_map->header.next
+    while ($_entry != &$_map->header)
+	print_vme $_entry
+	set $_entry = $_entry->next
+    end
+end
+
+define vmmap_13
+    set $_map = (struct vm_map *)$arg0
+    set $_entry = $_map->header.right
     set $_loop = 1
     while ($_loop)
-	if (($_entry->eflags & $MAP_ENTRY_IS_SUB_MAP) == 0)
-	    printf "0x%lx - 0x%lx ", $_entry->start, $_entry->end
-	    set $_obj = $_entry->object.vm_object
-	    printf "%p ", $_obj
-	    if ($_entry->protection & $VM_PROT_READ)
-		printf "r"
-	    else
-		printf "-"
+	print_vme $_entry
+	set $_after = $_entry->right
+	if ($_after->left->start > $_entry->start) {
+	    set $_after = $_after->left;
+	    while ($_after->left != $_entry)
+		set $_after = $_after->left;
 	    end
-	    if ($_entry->protection & $VM_PROT_WRITE)
-		printf "w"
-	    else
-		printf "-"
-	    end
-	    if ($_entry->protection & $VM_PROT_EXECUTE)
-		printf "x "
-	    else
-		printf "- "
-	    end
-	    if ($_obj != 0)
-		printf "%d %d 0x%x ", $_obj->ref_count, $_obj->shadow_count, \
-		    $_obj->flags
-	    else
-		printf "0 0 0x0 "
-	    end
-	    if ($_entry->eflags & $MAP_ENTRY_COW)
-		printf "COW "
-	    else
-		printf "!COW "
-	    end
-	    if ($_entry->eflags & $MAP_ENTRY_NEEDS_COPY)
-		printf "NC "
-	    else
-		printf "!NC "
-	    end
-	    print_vmo $_obj
-	    printf "\n"
 	end
-	set $_entry = $_entry->next
+	set $_entry = $_after
 	if ($_entry == &$_map->header)
 	    set $_loop = 0
 	end
+    end
+end
+
+define vmmap
+    if (osreldate >= 1300063)
+	vmmap_13 $arg0
+    else
+	vmmap_12 $arg0
     end
 end
 
