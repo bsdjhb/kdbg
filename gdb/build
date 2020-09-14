@@ -76,6 +76,7 @@ CONFIGURE_ARGS=
 CONFIGURE_ENV=
 LDFLAGS=
 PYTHON=
+CHERI_SDK=/home/john/work/cheri/output/sdk
 
 if [ -n "${WITH_GCC}" ]; then
 	CC="${WITH_GCC}"
@@ -133,37 +134,36 @@ elif [ $# -eq 1 ]; then
 			obj=obj.cheri
 			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=cheri-freebsd13.0
+			CLANG_TARGET=mips64-freebsd13.0
 			# -march=mips4?
 			CC_FLAGS="-msoft-float -mstack-alignment=32 \
 -cheri=256 -mabi=64 -B /usr/local/mips-freebsd/bin"
-			CC="/usr/cheri/bin/clang"
-			CXX="/usr/cheri/bin/clang++"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
 			AR=/usr/bin/ar
 			;;
 		cheri128)
 			obj=obj.cheri128
-			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips-hybrid128"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=cheri-freebsd13.0
+			CLANG_TARGET=mips64-freebsd13.0
 			# -march=mips4?
-			CC_FLAGS="-msoft-float -mstack-alignment=16 \
--cheri=128 -mabi=64 -B /usr/local/mips-freebsd/bin"
-			CC="/usr/cheri/bin/clang"
-			CXX="/usr/cheri/bin/clang++"
-			AR=/usr/bin/ar
+			CC_FLAGS="-msoft-float -cheri=128 -mabi=64 \
+-B /usr/local/mips-freebsd/bin"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
 			;;
 		mips64c)
 			obj=obj.cheriabi128
-			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs128"}
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips-purecap128"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=cheri-freebsd13.0
-			CC_FLAGS="-msoft-float -mstack-alignment=16 \
--cheri=128 -mabi=purecap -cheri-cap-table-abi=pcrel -mxcaptable \
--B /usr/local/mips-freebsd/bin"
-			CC="/usr/cheri/bin/clang"
-			CXX="/usr/cheri/bin/clang++"
-			AR=/usr/bin/ar
+			CLANG_TARGET=mips64-freebsd13.0
+			CC_FLAGS="-msoft-float -cheri=128 -mabi=purecap \
+-mxcaptable -B /usr/local/mips-freebsd/bin"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
 			;;
 		aarch64)
 			obj=obj.aarch64
@@ -192,6 +192,16 @@ elif [ $# -eq 1 ]; then
 			fi
 			AR="riscv64-unknown-freebsd${version}-ar"
 			;;
+		riscv64cheri)
+			obj=obj.riscv64cheri
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-riscv64-hybrid"}
+			HOST=riscv64-freebsd
+			CLANG_TARGET=riscv64-freebsd13.0
+			CC_FLAGS="-march=rv64imafdcxcheri -mabi=lp64d -mno-relax"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
+			;;		
 		powerpc64)
 			obj=obj.powerpc64
 			: ${ROOTFS:="/qemu/ppc64/rootfs"}
@@ -300,9 +310,9 @@ fi
 
 (cd $obj;
  env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
-     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing" \
+     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
      CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" \
-     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing" \
+     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
      LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS="" \
      INSTALL="/usr/bin/install -c " \
      INSTALL_DATA="install   -m 0644" \
