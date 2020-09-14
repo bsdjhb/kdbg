@@ -2127,13 +2127,13 @@ define print_file
 	$arg0->f_count, $arg0->f_vnode
 end
 
-define file
+define fp
     set $_fp = (struct file *)$arg0
     file_header
     print_file $_fp
 end
 
-document file
+document fp
 Display details about a file descriptor.
 end
 
