@@ -185,6 +185,10 @@ if ($arch[0] == 'i' && $arch[1] == '3' && $arch[2] == '8')
     source gdb6.i386
     set $__i386__ = 1
 end
+if ($arch[0] == 'r' && $arch[1] == 'i' && $arch[2] == 's')
+    source gdb6.riscv
+    set $__riscv__ = 1
+end
 
 # Lookup a process specified via $arg0.  We first check to see if it
 # is a valid PID, if not, we assume it is a pointer to a struct proc.
