@@ -77,6 +77,7 @@ CONFIGURE_ENV=
 LDFLAGS=
 PYTHON=
 CHERI_SDK=/home/john/work/cheri/output/sdk
+MORELLO_SDK=/home/john/work/cheri/output/morello-sdk
 
 if [ -n "${WITH_GCC}" ]; then
 	CC="${WITH_GCC}"
@@ -130,21 +131,9 @@ elif [ $# -eq 1 ]; then
 				AR=/usr/bin/ar
 			fi
 			;;
-		cheri256)
-			obj=obj.cheri
-			: ${ROOTFS:="/home/john/work/cheri/mips/rootfs"}
-			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd13.0
-			# -march=mips4?
-			CC_FLAGS="-msoft-float -mstack-alignment=32 \
--cheri=256 -mabi=64 -B /usr/local/mips-freebsd/bin"
-			CC="${CHERI_SDK}/bin/clang"
-			CXX="${CHERI_SDK}/bin/clang++"
-			AR=/usr/bin/ar
-			;;
 		cheri128)
 			obj=obj.cheri128
-			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips-hybrid128"}
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-hybrid"}
 			HOST=mips64-freebsd
 			CLANG_TARGET=mips64-freebsd13.0
 			# -march=mips4?
@@ -156,7 +145,7 @@ elif [ $# -eq 1 ]; then
 			;;
 		mips64c)
 			obj=obj.cheriabi128
-			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips-purecap128"}
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-purecap"}
 			HOST=mips64-freebsd
 			CLANG_TARGET=mips64-freebsd13.0
 			CC_FLAGS="-msoft-float -cheri=128 -mabi=purecap \
@@ -171,6 +160,26 @@ elif [ $# -eq 1 ]; then
 			HOST=aarch64-freebsd
 			CLANG_TARGET=aarch64-freebsd13.0
 			AR=/usr/bin/ar
+			;;
+		morello)
+			obj=obj.morello
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-hybrid"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd13.0
+			CC_FLAGS="-march=morello"
+			CC="${MORELLO_SDK}/bin/clang"
+			CXX="${MORELLO_SDK}/bin/clang++"
+			AR="${MORELLO_SDK}/bin/llvm-ar"
+			;;
+		aarch64c)
+			obj=obj.aarch64c
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-purecap"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd13.0
+			CC_FLAGS="-march=morello+c64 -mabi=purecap -femulated-tls"
+			CC="${MORELLO_SDK}/bin/clang"
+			CXX="${MORELLO_SDK}/bin/clang++"
+			AR="${MORELLO_SDK}/bin/llvm-ar"
 			;;
 		armv7)
 			obj=obj.arm
