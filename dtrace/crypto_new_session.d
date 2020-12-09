@@ -9,7 +9,6 @@ fbt::crypto_newsession:return
     printf("returned %d", arg1);
 }
 
-/*
 fbt::crypto_checkdriver:entry
 {
     printf("(0x%x)", arg1)
@@ -30,6 +29,7 @@ fbt::crypto_select_driver:return
     printf("=> %p", (void *)arg1)
 }
 
+/*
 fbt::driver_suitable:entry
 {
     printf("(%p, %p)", arg1, arg2);
@@ -118,6 +118,17 @@ fbt::isal_probesession:return
 }
 
 fbt::isal_newsession:return
+/arg1 != 0/
+{
+    printf("returned %d", arg1);
+}
+
+fbt::ossl_probesession:return
+{
+    printf("returned %d", arg1);
+}
+
+fbt::ossl_newsession:return
 /arg1 != 0/
 {
     printf("returned %d", arg1);
