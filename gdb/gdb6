@@ -2884,17 +2884,15 @@ document tcphc
 Print out the TCP hostcache entries.
 end
 
-define _tcps
+define inps
     if (osreldate >= 1200068)
         set $_inp = $arg0.ipi_listhead.clh_first
     else
         set $_inp = $arg0.ipi_listhead.lh_first
     end
     while ($_inp != 0)
-        if ($_inp->inp_inc.inc_ie.ie_fport == 0xb7b8)
-	    printf "%p: ", $_inp
-	    inaddr $_inp
-	end
+	printf "%p: ", $_inp
+	inaddr $_inp
 	if (osreldate >= 1200068)
 	    set $_inp = $_inp.inp_list.cle_next
 	else
@@ -2904,7 +2902,7 @@ define _tcps
 end
 
 define tcps
-    _tcps tcbinfo
+    inps tcbinfo
 end
 
 document tcps
@@ -2913,16 +2911,11 @@ end
 
 define vtcps
     set $_tcbinfo = (typeof(&vnet_entry_tcbinfo))($arg0->vnet_data_base + (uintptr_t)&vnet_entry_tcbinfo)
-    _tcps $_tcbinfo
+    inps $_tcbinfo
 end
 
 define udps
-    set $_inp = udbinfo.ipi_listhead.lh_first
-    while ($_inp != 0)
-	printf "%p: ", $_inp
-	inaddr $_inp
-	set $_inp = $_inp.inp_list.le_next
-    end
+    inps udbinfo
 end
 
 document udps
