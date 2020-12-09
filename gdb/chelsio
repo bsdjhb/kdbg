@@ -304,11 +304,12 @@ define cpl
 	printf " (FW4_ACK)"
 	bswap32 $_cpl->snd_nxt $_snd_nxt
 	bswap32 $_cpl->snd_una $_snd_una
-	printf " credits %d snd_nxt %d snd_una %d", $_cpl->credits, $_snd_nxt, \
+	printf " credits %d snd_nxt %u snd_una %u", $_cpl->credits, $_snd_nxt, \
 	    $_snd_una
     end
 end
 
+# <iq> <index>
 define iq_msg
     set $_offset = (char *)$arg0->desc + ($arg1 * $IQ_ESIZE)
     set $_rss = (struct rss_header *)$_offset
@@ -335,6 +336,7 @@ define iq_msg
     printf "\n"
 end
 
+# <iq> <index>
 define iq_msg_raw
     set $_base = (char *)$arg0->desc + ($arg1 * $IQ_ESIZE)
     set $_offset = 0
@@ -344,6 +346,20 @@ define iq_msg_raw
 	set $_base = $_base + 1
 	if ($_offset % 16 == 0)
 	    printf "\n"
+	end
+    end
+end
+
+# <iq> <start> <count>
+define iq_msgs
+    set $_iq = (struct sge_iq *)$arg0
+    set $_idx = $arg1
+    set $_count = $arg2
+    while ($_count-- > 0)
+	iq_msg $arg0 $_idx
+	set $_idx = $_idx + 1
+	if ($_idx == $_iq->qsize)
+	    set $_idx = 0
 	end
     end
 end
