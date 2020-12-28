@@ -193,6 +193,42 @@ if ($arch[0] == 'r' && $arch[1] == 'i' && $arch[2] == 's')
     set $__riscv__ = 1
 end
 
+
+define lookup_pid_by_hash
+  set $_pid = (unsigned)$arg0
+  set $_i = 0
+  set $_done = 0
+  while ($_i <= pidhash && $_done == 0)
+    set $_p = pidhashtbl[$_i].lh_first
+    while ($_p != 0)
+      if ($_p->p_pid == $_pid)
+	set $arg1 = $_p
+	set $_done = 1
+	loop_break
+      end
+      set $_p = $_p->p_hash.le_next
+    end
+    set $_i = $_i + 1
+  end
+end
+
+define lookup_pid_by_lists
+  set $_pid = (unsigned)$arg0
+  set $_zomb = 0
+  set $_p = allproc.lh_first
+  while ($_p)
+    if ($_p->p_pid == $_pid)
+      set $arg1 = $_p
+      loop_break
+    end
+    set $_p = $_p->p_list.le_next
+    if ($_p == 0 && $_zomb == 0)
+      set $_p = zombproc.lh_first
+      set $_zomb = 1
+    end
+  end
+end
+
 # Lookup a process specified via $arg0.  We first check to see if it
 # is a valid PID, if not, we assume it is a pointer to a struct proc.
 # If it looks like a PID, we walk the process lists to find it.  The
@@ -201,21 +237,68 @@ define lookup_proc
     set $_pid = (unsigned)$arg0
     set $arg1 = (struct proc *)$arg0
     if ($_pid <= $PID_MAX)
-	set $_zomb = 0
-	set $_p = allproc.lh_first
-	while ($_p)
-	    if ($_p->p_pid == $_pid)
-		set $arg1 = $_p
-		set $_p = 0
-	    else
-		set $_p = $_p->p_list.le_next
-		if ($_p == 0 && $_zomb == 0)
-		    set $_p = zombproc.lh_first
-		    set $_zomb = 1
-		end
-	    end
+	if (osreldate >= 1300042)
+	    lookup_pid_by_hash $arg0 $arg1
+	else
+	    lookup_pid_by_lists $arg0 $arg1
 	end
     end
+end
+
+define lookup_thread_by_hash
+  set $_id = (unsigned)$arg0
+  set $_done = 0
+  while ($_i <= pidhash && $_done == 0)
+    set $_p = pidhashtbl[$_i].lh_first
+    while ($_p != 0 && $_done == 0)
+      if ($arg2 && $_p->p_pid == $_id)
+	set $arg1 = $_p->p_threads.tqh_first
+	set $_done = 1
+	loop_break
+      end
+
+      set $_td = $_p->p_threads.tqh_first
+      while ($_td != 0)
+	if ($_td->td_tid == $_id)
+	  set $arg1 = $_td
+	  set $_done = 1
+	  loop_break
+	end
+	set $_td = $_td->td_plist.tqe_next
+      end
+      set $_p = $_p->p_hash.le_next
+    end
+    set $_i = $_i + 1
+  end
+end
+
+define lookup_thread_by_lists
+  set $_id = (unsigned)$arg0
+  set $_zomb = 0
+  set $_done = 0
+  set $_p = allproc.lh_first
+  while ($_p != 0 && $_done == 0)
+    if ($arg2 && $_p->p_pid == $_id)
+      set $arg1 = $_p->p_threads.tqh_first
+      loop_break
+    end
+
+    set $_td = $_p->p_threads.tqh_first
+    while ($_td != 0)
+      if ($_td->td_tid == $_id)
+	set $arg1 = $_td
+	set $_done = 1
+	loop_break
+      end
+      set $_td = $_td->td_plist.tqe_next
+    end
+
+    set $_p = $_p->p_list.le_next
+    if ($_p == 0 && $_zomb == 0)
+      set $_p = zombproc.lh_first
+      set $_zomb = 1
+    end
+  end
 end
 
 # Lookup a thread specified via $arg0.  We walk all the processes and threads
@@ -228,31 +311,10 @@ define lookup_thread
     set $_id = (unsigned)$arg0
     set $arg1 = (struct thread *)$arg0
     if ($_id <= $TID_MAX)
-	set $_zomb = 0
-	set $_p = allproc.lh_first
-	while ($_p)
-	    if ($arg2 && $_p->p_pid == $_id)
-		set $arg1 = $_p->p_threads.tqh_first
-		set $_p = 0
-	    else
-		set $_td = $_p->p_threads.tqh_first
-		while ($_td)
-		    if ($_td->td_tid == $_id)
-			set $arg1 = $_td
-			set $_td = 0
-			set $_p = 0
-		    else
-			set $_td = $_td->td_plist.tqe_next
-		    end
-		end
-		if ($_p)
-		    set $_p = $_p->p_list.le_next
-		    if ($_p == 0 && $_zomb == 0)
-			set $_p = zombproc.lh_first
-			set $_zomb = 1
-		    end
-		end
-	    end
+	if (osreldate >= 1300042)
+	    lookup_thread_by_hash $arg0 $arg1 $arg2
+	else
+	    lookup_thread_by_lists $arg0 $arg1 $arg2
 	end
     end
 end
@@ -525,7 +587,9 @@ define dumpproc
     printf " "
     set $x = $arg0.p_flag & $P_HADTHREADS
     if ($x)
-	printf " (threaded)          %s\n", $arg0.p_comm
+	printf " (threaded)"
+	spaces $PTRWIDTH
+	printf "%s\n", $arg0.p_comm
     end
 
     set $td = $arg0.p_threads.tqh_first
@@ -545,39 +609,66 @@ define ps_header
     printf " cmd\n"
 end
 
+define walk_procs_hash
+  set $_i = 0
+  while ($_i <= pidhash)
+    set $_p = pidhashtbl[$_i].lh_first
+    while ($_p != 0)
+      $arg0 $_p
+      set $_p = $_p->p_hash.le_next
+    end
+    set $_i = $_i + 1
+  end
+end
+
+define walk_procs_list
+  set $_p = allproc.lh_first
+  while ($_p != 0)
+    $arg0 $_p
+    set $p = $p.p_list.le_next
+  end
+  
+  set $_p = zombproc.lh_first
+  while ($_p != 0)
+    $arg0 $_p
+    set $p = $p.p_list.le_next
+  end
+end
+
+define ps_walker
+  set $_p = allproc.lh_first
+  if ($_p == 0)
+    $arg0 &proc0
+  else
+    if (osreldate >= 1300042)
+      walk_procs_hash $arg0
+    else
+      walk_procs_list $arg0
+    end
+  end
+end
+
 # ps: equivalent of the userland command
 define ps
-    set $nproc = nprocs
-    set $p = allproc.lh_first
     ps_header
-    while (--$nproc >= 0)
-	dumpproc $p
-	set $p = $p.p_list.le_next
-	if ($p == 0 && $nproc > 0)
-	    set $p = zombproc.lh_first
-	end
-    end
+    ps_walker dumpproc
 end
 document ps
 Show process status without options. 
 end
 
 # qps: "quick" ps skips any single threaded procs that are asleep
+define qps_dump
+  set $_td = $arg0->p_threads.tqh_first
+  if ($arg0->p_flag & $P_HADTHREADS || $_td->td_state != TDS_INHIBITED || \
+    $_td->td_inhibitors & $TDI_LOCK)
+    dumpproc $arg0
+  end
+end
+
 define qps
-    set $nproc = nprocs
-    set $p = allproc.lh_first
     ps_header
-    while (--$nproc >= 0)
-	set $td = $p->p_threads.tqh_first
-	if ($p.p_flag & $P_HADTHREADS || $td->td_state != TDS_INHIBITED || \
-	    $td->td_inhibitors & $TDI_LOCK)
-	    dumpproc $p
-	end
-	set $p = $p.p_list.le_next
-	if ($p == 0 && $nproc > 0)
-	    set $p = zombproc.lh_first
-	end
-    end
+    ps_walker qps_dump
 end
 document qps
 Show process status of non-idle processes without options. 
@@ -585,21 +676,17 @@ end
 
 # rps: "run" ps skips any single threaded procs that are inhibited by more
 # than just being swapped out
+define rps_dump
+  set $_td = $arg0->p_threads.tqh_first
+  if ($arg0->p_flag & $P_HADTHREADS || $_td->td_state != TDS_INHIBITED || \
+    $_td->td_inhibitors == $TDI_SWAPPED)
+    dumpproc $arg0
+  end
+end
+
 define rps
-    set $nproc = nprocs
-    set $p = allproc.lh_first
     ps_header
-    while (--$nproc >= 0)
-	set $td = $p->p_threads.tqh_first
-	if ($p.p_flag & $P_HADTHREADS || $td->td_state != TDS_INHIBITED || \
-	    $td->td_inhibitors == $TDI_SWAPPED)
-	    dumpproc $p
-	end
-	set $p = $p.p_list.le_next
-	if ($p == 0 && $nproc > 0)
-	    set $p = zombproc.lh_first
-	end
-    end
+    ps_walker rps_dump
 end
 document rps
 Show process status of runnable processes without options. 
@@ -607,21 +694,17 @@ end
 
 # qqps: "really quick" ps skips any single threaded procs that are asleep or
 # on the run queue
+define qqps_dump
+  set $_td = $arg0->p_threads.tqh_first
+  if ($arg0->p_flag & $P_HADTHREADS || ($_td->td_state != TDS_INHIBITED && \
+    $_td->td_state != TDS_RUNQ) || $_td->td_inhibitors & $TDI_LOCK)
+    dumpproc $arg0
+  end
+end
+
 define qqps
-    set $nproc = nprocs
-    set $p = allproc.lh_first
     ps_header
-    while (--$nproc >= 0)
-	set $td = $p->p_threads.tqh_first
-	if ($p.p_flag & $P_HADTHREADS || ($td->td_state != TDS_INHIBITED && \
-	    $td->td_state != TDS_RUNQ) || $td->td_inhibitors & $TDI_LOCK)
-	    dumpproc $p
-	end
-	set $p = $p.p_list.le_next
-	if ($p == 0 && $nproc > 0)
-	    set $p = zombproc.lh_first
-	end
-    end
+    ps_walker qqps_dump
 end
 document qqps
 Show process status of non-idle processes excluding those on the run queue. 
