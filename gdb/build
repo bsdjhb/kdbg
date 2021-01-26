@@ -55,7 +55,7 @@ fi
 if [ -n "$USE_GCC" -a -n "$WITH_GCC" ]; then
 	usage
 fi
-	
+
 # Figure out some variables and set some defaults
 version=`uname -r | cut -d- -f1`
 arch=`uname -m`
@@ -102,7 +102,7 @@ elif [ $# -eq 1 ]; then
 			HOST=mips-freebsd
 			CLANG_TARGET=mips-freebsd13.0
 			CC_FLAGS="-msoft-float -mabi=32"
-			if [ -n ${USE_GCC} ]; then
+			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
 				CXX="mips-unknown-freebsd${version}-g++"
 				AR=/usr/bin/ar
@@ -114,7 +114,7 @@ elif [ $# -eq 1 ]; then
 			HOST=mips64-freebsd
 			CLANG_TARGET=mips-freebsd13.0-xxx
 			CC_FLAGS="-msoft-float -mabi=n32"
-			if [ -n ${USE_GCC} ]; then
+			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
 				CXX="mips-unknown-freebsd${version}-g++"
 			fi
@@ -125,7 +125,7 @@ elif [ $# -eq 1 ]; then
 			HOST=mips64-freebsd
 			CLANG_TARGET=mips64-freebsd13.0
 			CC_FLAGS="-msoft-float -mabi=64"
-			if [ -n ${USE_GCC} ]; then
+			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
 				CXX="mips-unknown-freebsd${version}-g++"
 				AR=/usr/bin/ar
@@ -195,7 +195,7 @@ elif [ $# -eq 1 ]; then
 			CLANG_TARGET=riscv64-freebsd13.0
 			CC_FLAGS="-march=rv64imafdc -mabi=lp64d"
 			CLANG_CC_FLAGS="-mno-relax"
-			if [ -n ${USE_GCC} ]; then
+			if [ -n "${USE_GCC}" ]; then
 				CC="riscv64-unknown-freebsd${version}-gcc"
 				CXX="riscv64-unknown-freebsd${version}-g++"
 			fi
@@ -216,7 +216,7 @@ elif [ $# -eq 1 ]; then
 			: ${ROOTFS:="/qemu/ppc64/rootfs"}
 			HOST=powerpc64-freebsd
 			CLANG_TARGET=powerpc64-freebsd13.0
-			if [ -n ${USE_GCC} ]; then
+			if [ -n "${USE_GCC}" ]; then
 				CC="powerpc64-unknown-freebsd${version}-gcc"
 				CXX="powerpc64-unknown-freebsd${version}-g++"
 			fi
