@@ -3814,8 +3814,8 @@ define tcpstatename
     end
 end
 
-define nfsd_sockets_8
-    set $_xprt = nfsrv_pool.sp_xlist.tqh_first
+define nfsd_sockets_8_impl
+    set $_xprt = $arg0
     while ($_xprt != 0)
 	printf "%p: ", $_xprt->xp_socket
 	if ($_xprt->xp_ltaddr.ss_len != 0)
@@ -3840,11 +3840,29 @@ define nfsd_sockets_8
     end
 end
 
+define nfsd_sockets_8
+    set $_xprt = nfsrv_pool.sp_xlist.tqh_first
+    nfsd_sockets_8_impl $_xprt
+end
+
+define nfsd_sockets_11
+    set $_group = 0
+    while ($_group < nfsrvd_pool.sp_groupcount)
+	set $_xprt = nfsrvd_pool.sp_groups[$_group].sg_xlist.tqh_first
+	nfsd_sockets_8_impl $_xprt
+	set $_group = $_group + 1
+    end
+end
+
 define nfsd_sockets
-    if ($osrelease >= 8)
-	nfsd_sockets_8
+    if ($osrelease >= 11)
+	nfsd_sockets_11
     else
-	nfsd_sockets_7
+	if ($osrelease >= 8)
+	    nfsd_sockets_8
+	else
+	    nfsd_sockets_7
+	end
     end
 end
 
