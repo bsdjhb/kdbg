@@ -241,17 +241,26 @@ set $X_RSPD_TYPE_CPL = 1
 set $X_RSPD_TYPE_INTR = 2
 
 set $CPL_CLOSE_CON_RPL = 0x32
+set $CPL_ISCSI_HDR = 0x33
 set $CPL_RX_DATA = 0x39
 set $CPL_RX_PKT = 0x3B
 set $CPL_PASS_ESTABLISH = 0x41
 set $CPL_RX_DATA_DDP = 0x42
+set $CPL_RX_ISCSI_CMP = 0x45
+set $CPL_RX_ISCSI_DDP = 0x49
+set $CPL_ISCSI_DATA = 0xB2
 set $CPL_FW4_ACK = 0xC3
 
 set $IQ_ESIZE = 64
 
-set $DDP_ERR = 0xffe8000
+set $DDP_ERR = 0x0ffe8000
 
 set $F_DDP_BUF_IDX = 0x4000000
+
+define bhs
+    set $_bhs = (struct iscsi_bhs *)$arg0
+    printf " iSCSI %02x", $_bhs->bhs_opcode
+end
 
 define cpl
     set $_ot = (union opcode_tid *)$arg0
@@ -265,10 +274,18 @@ define cpl
 	printf " (CLOSE_CON_RPL) status %#x snd_nxt %d rcv_nxt %d", \
 	    $_cpl->status, $_snd_nxt, $_rcv_nxt
     end
+    if ($_ot->opcode == $CPL_ISCSI_HDR)
+	set $_cpl = (struct cpl_iscsi_hdr *)$_ot
+	bswap16 $_cpl->pdu_len_ddp $_len
+	bswap32 $_cpl->seq $_seq
+	printf " (ISCSI_HDR) seq %u len %d", $_seq, $_len
+	bhs ($_cpl+1)
+    end
     if ($_ot->opcode == $CPL_RX_DATA)
 	set $_cpl = (struct cpl_rx_data *)$_ot
 	bswap16 $_cpl->len $_len
-	printf " (RX_DATA) len %d", $_len
+	bswap32 $_cpl->seq $_seq
+	printf " (RX_DATA) seq %u len %d", $_seq, $_len
 	if ($_cpl->ddp_off)
 	    printf " DDP off"
 	else
@@ -298,6 +315,37 @@ define cpl
 	    bswap16 $_cpl->len $_len
 	    printf " buf %d len %d", $_report & $F_DDP_BUF_IDX ? 1 : 0, $_len
 	end
+    end
+    if ($_ot->opcode == $CPL_RX_ISCSI_CMP)
+	set $_cpl = (struct cpl_rx_iscsi_cmp *)$_ot
+	printf " (RX_ISCSI_CMP)"
+	bswap32 $_cpl->ddpvld $_vld
+	if ($_vld & $DDP_ERR)
+	    printf " invalid (%x)", $_vld
+	else
+	    bswap16 $_cpl->pdu_len_ddp $_len
+	    bswap32 $_cpl->seq $_seq
+	    printf " seq %u len %d", $_seq, $_len
+	    bhs ($_cpl+1)
+	end
+    end
+    if ($_ot->opcode == $CPL_RX_ISCSI_DDP)
+	set $_cpl = (struct cpl_rx_data_ddp *)$_ot
+	printf " (RX_ISCSI_DDP)"
+	bswap32 $_cpl->ddpvld $_vld
+	if ($_vld & $DDP_ERR)
+	    printf " invalid (%x)", $_vld
+	else
+	    bswap32 $_cpl->seq $_seq
+	    bswap16 $_cpl->len $_len
+	    printf " seq %u len %d", $_seq, $_len
+	end
+    end
+    if ($_ot->opcode == $CPL_ISCSI_DATA)
+	set $_cpl = (struct cpl_iscsi_data *)$_ot
+	bswap16 $_cpl->len $_len
+	bswap32 $_cpl->seq $_seq
+	printf " (ISCSI_DATA) seq %u len %d", $_seq, $_len
     end
     if ($_ot->opcode == $CPL_FW4_ACK)
 	set $_cpl = (struct cpl_fw4_ack *)$_ot
