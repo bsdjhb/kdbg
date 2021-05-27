@@ -100,7 +100,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.mips
 			: ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
 			HOST=mips-freebsd
-			CLANG_TARGET=mips-freebsd13.0
+			CLANG_TARGET=mips-freebsd14.0
 			CC_FLAGS="-msoft-float -mabi=32"
 			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
@@ -112,7 +112,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.mipsn32
 			: ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=mips-freebsd13.0-xxx
+			CLANG_TARGET=mips-freebsd14.0-xxx
 			CC_FLAGS="-msoft-float -mabi=n32"
 			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
@@ -123,7 +123,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.mips64
 			: ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd13.0
+			CLANG_TARGET=mips64-freebsd14.0
 			CC_FLAGS="-msoft-float -mabi=64"
 			if [ -n "${USE_GCC}" ]; then
 				CC="mips-unknown-freebsd${version}-gcc"
@@ -135,7 +135,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.cheri128
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-hybrid"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd13.0
+			CLANG_TARGET=mips64-freebsd14.0
 			# -march=mips4?
 			CC_FLAGS="-msoft-float -cheri=128 -mabi=64 \
 -B /usr/local/mips-freebsd/bin"
@@ -147,7 +147,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.cheriabi128
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-purecap"}
 			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd13.0
+			CLANG_TARGET=mips64-freebsd14.0
 			CC_FLAGS="-msoft-float -cheri=128 -mabi=purecap \
 -mxcaptable -B /usr/local/mips-freebsd/bin"
 			CC="${CHERI_SDK}/bin/clang"
@@ -158,14 +158,14 @@ elif [ $# -eq 1 ]; then
 			obj=obj.aarch64
 			: ${ROOTFS:="/mnt"}
 			HOST=aarch64-freebsd
-			CLANG_TARGET=aarch64-freebsd13.0
+			CLANG_TARGET=aarch64-freebsd14.0
 			AR=/usr/bin/ar
 			;;
 		morello)
 			obj=obj.morello
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-hybrid"}
 			HOST=aarch64-freebsd
-			CLANG_TARGET=aarch64-freebsd13.0
+			CLANG_TARGET=aarch64-freebsd14.0
 			CC_FLAGS="-march=morello"
 			CC="${MORELLO_SDK}/bin/clang"
 			CXX="${MORELLO_SDK}/bin/clang++"
@@ -175,7 +175,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.aarch64c
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-purecap"}
 			HOST=aarch64-freebsd
-			CLANG_TARGET=aarch64-freebsd13.0
+			CLANG_TARGET=aarch64-freebsd14.0
 			CC_FLAGS="-march=morello+c64 -mabi=purecap -femulated-tls"
 			CC="${MORELLO_SDK}/bin/clang"
 			CXX="${MORELLO_SDK}/bin/clang++"
@@ -185,27 +185,27 @@ elif [ $# -eq 1 ]; then
 			obj=obj.arm
 			: ${ROOTFS:="/mnt"}
 			HOST=arm-gnueabi-freebsd
-			CLANG_TARGET=armv7-gnueabihf-freebsd13.0
+			CLANG_TARGET=armv7-gnueabihf-freebsd14.0
 			AR=/usr/bin/ar
 			;;
 		riscv64)
 			obj=obj.riscv64
 			: ${ROOTFS:="/home/john/work/qemu/riscv64/rootfs"}
 			HOST=riscv64-freebsd
-			CLANG_TARGET=riscv64-freebsd13.0
+			CLANG_TARGET=riscv64-freebsd14.0
 			CC_FLAGS="-march=rv64imafdc -mabi=lp64d"
 			CLANG_CC_FLAGS="-mno-relax"
 			if [ -n "${USE_GCC}" ]; then
 				CC="riscv64-unknown-freebsd${version}-gcc"
 				CXX="riscv64-unknown-freebsd${version}-g++"
 			fi
-			AR="riscv64-unknown-freebsd${version}-ar"
+			AR=/usr/bin/ar
 			;;
 		riscv64cheri)
 			obj=obj.riscv64cheri
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-riscv64-hybrid"}
 			HOST=riscv64-freebsd
-			CLANG_TARGET=riscv64-freebsd13.0
+			CLANG_TARGET=riscv64-freebsd14.0
 			CC_FLAGS="-march=rv64imafdcxcheri -mabi=lp64d -mno-relax"
 			CC="${CHERI_SDK}/bin/clang"
 			CXX="${CHERI_SDK}/bin/clang++"
@@ -215,7 +215,7 @@ elif [ $# -eq 1 ]; then
 			obj=obj.powerpc64
 			: ${ROOTFS:="/qemu/ppc64/rootfs"}
 			HOST=powerpc64-freebsd
-			CLANG_TARGET=powerpc64-freebsd13.0
+			CLANG_TARGET=powerpc64-freebsd14.0
 			if [ -n "${USE_GCC}" ]; then
 				CC="powerpc64-unknown-freebsd${version}-gcc"
 				CXX="powerpc64-unknown-freebsd${version}-g++"
@@ -270,12 +270,14 @@ if echo "${cc_version}" | grep -q clang ; then
 fi
 if [ -n "${ROOTFS}" ]; then
 	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
+	CONFIGURE_ARGS="--with-build-sysroot=${ROOTFS}"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-rpath"
 fi
 CC="${CC} ${CC_FLAGS}"
 CXX="${CXX} ${CC_FLAGS}"
 
 if [ -n "${AR}" ]; then
-    CONFIGURE_ENV="${CONFIGURE_ENV} AR=${AR}"
+	CONFIGURE_ENV="${CONFIGURE_ENV} AR=${AR}"
 fi
 
 if [ -n "${WITH_UBSAN}" ]; then
@@ -293,6 +295,7 @@ fi
 if [ -n "${HOST}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --without-expat"
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-source-highlight"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-sim"
 	CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
 else
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-expat"
@@ -309,7 +312,8 @@ mkdir $obj
 CONFIGURE_ARGS="--enable-targets=all \
 --with-separate-debug-dir=/usr/lib/debug \
 --without-libunwind-ia64 --enable-tui \
---prefix=/usr/local  --mandir=/usr/local/man --infodir=/usr/local/info/ \
+--prefix=${ROOTFS}/usr/local  --mandir=${ROOTFS}/usr/local/man \
+--infodir=${ROOTFS}/usr/local/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls \
 --disable-ld --enable-64-bit-bfd ${CONFIGURE_ARGS}"
 
@@ -320,9 +324,9 @@ fi
 (cd $obj;
  env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
      CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
-     CPPFLAGS="-DLIBICONV_PLUG -I/usr/local/include" \
+     CPPFLAGS="-DLIBICONV_PLUG" \
      CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
-     LDFLAGS="${LDFLAGS} -L/usr/local/lib" LIBS="" \
+     LDFLAGS="${LDFLAGS}" LIBS="" \
      INSTALL="/usr/bin/install -c " \
      INSTALL_DATA="install   -m 0644" \
      INSTALL_LIB="install    -m 444" \
