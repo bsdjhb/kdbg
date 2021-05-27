@@ -1,0 +1,301 @@
+#!/bin/sh
+#
+# Setup a build env and build gdb similar to how ports builds it
+
+usage()
+{
+	cat <<EOF
+usage: build [-g gcc|-G] [-r sysroot] [-s gmpdir] -f config file
+       build [-g gcc|-G] [-r sysroot] [-s gmpdir] [config]
+
+       -f: path to a config file
+       -g: gcc compiler to use
+       -G: pick a default GCC for the config
+       -r: path to a sysroot (defaults to / for native)
+       -s: path to GDB source (defaults to pwd)
+       config: built in configuration, native if none given
+EOF
+	exit 1
+}
+
+GMP_DIR=${PWD}
+while getopts "f:Gg:r:s" option; do
+	case "$option" in
+		f)
+			config="$OPTARG"
+			;;
+		G)
+			USE_GCC=yes
+			;;
+		g)
+			WITH_GCC="$OPTARG"
+			;;
+		r)
+			ROOTFS="$OPTARG"
+			;;
+		s)
+			GMP_DIR="$OPTARG"
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# Check for invalid arguments
+if [ $# -gt 1 ]; then
+	usage
+fi
+
+if [ $# -eq 1 -a -n "$config" ]; then
+	usage
+fi
+
+if [ -n "$USE_GCC" -a -n "$WITH_GCC" ]; then
+	usage
+fi
+
+# Figure out some variables and set some defaults
+version=`uname -r | cut -d- -f1`
+arch=`uname -m`
+case $arch in
+	amd64)
+		cfgarch=x86_64
+		;;
+	*)
+		cfgarch=${arch}
+		;;
+esac
+
+# Cross-compile configurations should set this to the triple
+# to pass to --host
+HOST=
+
+CONFIGURE_ARGS=
+CONFIGURE_ENV=
+LDFLAGS=
+CHERI_SDK=/home/john/work/cheri/output/sdk
+MORELLO_SDK=/home/john/work/cheri/output/morello-sdk
+
+if [ -n "${WITH_GCC}" ]; then
+	CC="${WITH_GCC}"
+	CXX=$(echo ${WITH_GCC} | sed -e 's/gcc/g++/')
+else
+	CC="cc"
+	CXX="c++"
+fi
+
+if [ -n "$config" ]; then
+	if ! [ -r "$config" ]; then
+		echo "Can't read config file"
+		exit 1
+	fi
+	. ${config}
+	config=
+elif [ $# -eq 1 ]; then
+	case "$1" in
+		mips)
+			obj=obj.mips
+			: ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
+			HOST=mips-freebsd
+			CLANG_TARGET=mips-freebsd14.0
+			CC_FLAGS="-msoft-float -mabi=32"
+			if [ -n "${USE_GCC}" ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+				AR=/usr/bin/ar
+			fi
+			;;
+		mipsn32)
+			obj=obj.mipsn32
+			: ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips-freebsd14.0-xxx
+			CC_FLAGS="-msoft-float -mabi=n32"
+			if [ -n "${USE_GCC}" ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+			fi
+			;;
+		mips64)
+			obj=obj.mips64
+			: ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips64-freebsd14.0
+			CC_FLAGS="-msoft-float -mabi=64"
+			if [ -n "${USE_GCC}" ]; then
+				CC="mips-unknown-freebsd${version}-gcc"
+				CXX="mips-unknown-freebsd${version}-g++"
+				AR=/usr/bin/ar
+			fi
+			;;
+		cheri128)
+			obj=obj.cheri128
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-hybrid"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips64-freebsd14.0
+			# -march=mips4?
+			CC_FLAGS="-msoft-float -cheri=128 -mabi=64 \
+-B /usr/local/mips-freebsd/bin"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
+			;;
+		mips64c)
+			obj=obj.cheriabi128
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-purecap"}
+			HOST=mips64-freebsd
+			CLANG_TARGET=mips64-freebsd14.0
+			CC_FLAGS="-msoft-float -cheri=128 -mabi=purecap \
+-mxcaptable -B /usr/local/mips-freebsd/bin"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
+			;;
+		aarch64)
+			obj=obj.aarch64
+			: ${ROOTFS:="/mnt"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd14.0
+			AR=/usr/bin/ar
+			;;
+		morello)
+			obj=obj.morello
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-hybrid"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd14.0
+			CC_FLAGS="-march=morello"
+			CC="${MORELLO_SDK}/bin/clang"
+			CXX="${MORELLO_SDK}/bin/clang++"
+			AR="${MORELLO_SDK}/bin/llvm-ar"
+			;;
+		aarch64c)
+			obj=obj.aarch64c
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-purecap"}
+			HOST=aarch64-freebsd
+			CLANG_TARGET=aarch64-freebsd14.0
+			CC_FLAGS="-march=morello+c64 -mabi=purecap -femulated-tls"
+			CC="${MORELLO_SDK}/bin/clang"
+			CXX="${MORELLO_SDK}/bin/clang++"
+			AR="${MORELLO_SDK}/bin/llvm-ar"
+			;;
+		armv7)
+			obj=obj.arm
+			: ${ROOTFS:="/mnt"}
+			HOST=arm-gnueabi-freebsd
+			CLANG_TARGET=armv7-gnueabihf-freebsd14.0
+			AR=/usr/bin/ar
+			;;
+		riscv64)
+			obj=obj.riscv64
+			: ${ROOTFS:="/home/john/work/qemu/riscv64/rootfs"}
+			HOST=riscv64-freebsd
+			CLANG_TARGET=riscv64-freebsd14.0
+			CC_FLAGS="-march=rv64imafdc -mabi=lp64d"
+			CLANG_CC_FLAGS="-mno-relax"
+			if [ -n "${USE_GCC}" ]; then
+				CC="riscv64-unknown-freebsd${version}-gcc"
+				CXX="riscv64-unknown-freebsd${version}-g++"
+			fi
+			AR=/usr/bin/ar
+			;;
+		riscv64cheri)
+			obj=obj.riscv64cheri
+			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-riscv64-hybrid"}
+			HOST=riscv64-freebsd
+			CLANG_TARGET=riscv64-freebsd14.0
+			CC_FLAGS="-march=rv64imafdcxcheri -mabi=lp64d -mno-relax"
+			CC="${CHERI_SDK}/bin/clang"
+			CXX="${CHERI_SDK}/bin/clang++"
+			AR="${CHERI_SDK}/bin/llvm-ar"
+			;;		
+		powerpc64)
+			obj=obj.powerpc64
+			: ${ROOTFS:="/qemu/ppc64/rootfs"}
+			HOST=powerpc64-freebsd
+			CLANG_TARGET=powerpc64-freebsd14.0
+			if [ -n "${USE_GCC}" ]; then
+				CC="powerpc64-unknown-freebsd${version}-gcc"
+				CXX="powerpc64-unknown-freebsd${version}-g++"
+			fi
+			;;
+		*)
+			echo "Unknown configuration"
+			exit 1
+			;;
+	esac
+else
+	case $arch in
+		amd64)
+			obj=obj
+			;;
+		*)
+			obj=obj.${arch}
+			;;
+	esac
+	if [ -n "$WITH_GCC" ]; then
+		obj=${obj}.gcc
+		WANT_WERROR=yes
+	fi
+	if [ -n "$USE_GCC" ]; then
+		echo "native doesn't support implicit gcc via -G"
+		exit 1
+	fi
+fi
+
+cc_version=`${CC} -v 2>&1`
+if [ $? -ne 0 ]; then
+	echo "Compilers are not executable:"
+	echo " CC=${CC}"
+	echo " CXX=${CXX}"
+	exit 1
+fi
+
+if echo "${cc_version}" | grep -q clang ; then
+	if [ -n "${CLANG_TARGET}" ]; then
+		CC_FLAGS="-target ${CLANG_TARGET} ${CC_FLAGS}"
+	fi
+	CC_FLAGS="${CC_FLAGS} ${CLANG_CC_FLAGS}"
+	: ${LDFLAGS:="-fuse-ld=lld -Wl,--gdb-index"}
+fi
+if [ -n "${ROOTFS}" ]; then
+	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-sysroot=${ROOTFS}"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-rpath"
+fi
+CC="${CC} ${CC_FLAGS}"
+CXX="${CXX} ${CC_FLAGS}"
+
+if [ -n "${AR}" ]; then
+	CONFIGURE_ENV="${CONFIGURE_ENV} AR=${AR}"
+fi
+
+# First, make an obj tree
+mkdir $obj
+
+# Next, run configure
+CONFIGURE_ARGS="--enable-cxx --prefix=${ROOTFS}/usr/local \
+--mandir=${ROOTFS}/usr/local/man --infodir=${ROOTFS}/usr/local/info/ \
+--build=${cfgarch}-portbld-freebsd${version} ${CONFIGURE_ARGS}"
+
+if [ -n "${HOST}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=${HOST}"
+fi
+
+(cd $obj;
+ env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
+     CFLAGS="-pipe -g -O2 -fno-strict-aliasing" \
+     CPPFLAGS="" \
+     CXXFLAGS="-pipe -g -O2 -fno-strict-aliasing" \
+     LDFLAGS="${LDFLAGS}" LIBS="" \
+     INSTALL="/usr/bin/install -c " \
+     INSTALL_DATA="install   -m 0644" \
+     INSTALL_LIB="install    -m 444" \
+     INSTALL_PROGRAM="install    -m 555" \
+     INSTALL_SCRIPT="install   -m 555" \
+     CONFIGURED_M4=m4 CONFIGURED_BISON=byacc TMPDIR="/tmp" MAKE=gmake \
+     SHELL=/bin/sh CONFIG_SHELL=/bin/sh \
+     CONFIG_SITE=/usr/ports/Templates/config.site \
+     lt_cv_sys_max_cmd_len=262144 ${CONFIGURE_ENV} \
+     ${GMP_DIR}/configure ${CONFIGURE_ARGS} )
