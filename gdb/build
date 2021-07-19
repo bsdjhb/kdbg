@@ -19,7 +19,7 @@ EOF
 }
 
 GDB_DIR=${PWD}
-while getopts "f:Gg:r:s" option; do
+while getopts "f:Gg:r:s:" option; do
 	case "$option" in
 		f)
 			config="$OPTARG"
