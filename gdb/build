@@ -301,6 +301,10 @@ else
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-expat"
 fi
 
+if [ -z "${WANT_SIM}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-sim"
+fi
+
 if [ -z "${WANT_WERROR}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-werror"
 fi
