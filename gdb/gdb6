@@ -107,6 +107,8 @@ set $MAP_ENTRY_IS_SUB_MAP = 0x0002
 set $MAP_ENTRY_COW = 0x0004
 set $MAP_ENTRY_NEEDS_COPY = 0x0008
 set $MAP_ENTRY_NOFAULT = 0x0010
+set $MAP_ENTRY_NOCOREDUMP = 0x0400
+set $MAP_ENTRY_GUARD = 0x00010000
 
 set $MTX_UNOWNED = 4
 
@@ -3606,6 +3608,12 @@ define print_vme
 	else
 	    printf "!NC "
 	end
+	if ($arg0->eflags & $MAP_ENTRY_GUARD)
+	    printf "GUARD "
+	end
+	if ($arg0->eflags & $MAP_ENTRY_NOCOREDUMP)
+	    printf "NOCORE "
+	end
 	print_vmo $_obj
 	printf "\n"
     end
@@ -3627,10 +3635,10 @@ define vmmap_13
     while ($_loop)
 	print_vme $_entry
 	set $_after = $_entry->right
-	if ($_after->left->start > $_entry->start) {
-	    set $_after = $_after->left;
+	if ($_after->left->start > $_entry->start)
+	    set $_after = $_after->left
 	    while ($_after->left != $_entry)
-		set $_after = $_after->left;
+		set $_after = $_after->left
 	    end
 	end
 	set $_entry = $_after
