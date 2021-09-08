@@ -301,6 +301,14 @@ else
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-expat"
 fi
 
+if [ -z "${WANT_BINUTILS}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-binutils"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-ld"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-gold"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-gas"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-gprof"
+fi
+
 if [ -z "${WANT_SIM}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-sim"
 fi
@@ -319,7 +327,7 @@ CONFIGURE_ARGS="--enable-targets=all \
 --prefix=${ROOTFS}/usr/local  --mandir=${ROOTFS}/usr/local/man \
 --infodir=${ROOTFS}/usr/local/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls \
---disable-ld --enable-64-bit-bfd ${CONFIGURE_ARGS}"
+--enable-64-bit-bfd ${CONFIGURE_ARGS}"
 
 if [ -n "${HOST}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=${HOST}"
