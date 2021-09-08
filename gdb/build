@@ -327,7 +327,7 @@ CONFIGURE_ARGS="--enable-targets=all \
 --prefix=${ROOTFS}/usr/local  --mandir=${ROOTFS}/usr/local/man \
 --infodir=${ROOTFS}/usr/local/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls \
---enable-64-bit-bfd ${CONFIGURE_ARGS}"
+--with-system-zlib --enable-64-bit-bfd ${CONFIGURE_ARGS}"
 
 if [ -n "${HOST}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=${HOST}"
