@@ -2532,6 +2532,46 @@ document runtds
 Display running threads and their priorities.
 end
 
+define dumpblockedthread
+    if ($arg0->td_state == TDS_INHIBITED && \
+      ($arg0->td_inhibitors & ($TDI_LOCK | $TDI_SLEEPING)) != 0)
+	printf "%5d %9d ", $arg0->td_proc->p_pid, $arg0->td_tid
+	if (($arg0->td_inhibitors & $TDI_LOCK) != 0)
+	    set $_tticks = $arg0->td_blktick
+	else
+	    set $_tticks = $arg0->td_slptick
+	end
+	printf "%9d ", ticks - $_tticks
+        if ($arg0->td_inhibitors & $TDI_LOCK)
+	    printf "*%-8.8s ", $arg0->td_lockname
+        else
+	    printf " %-8.8s ", $arg0->td_wmesg
+	end
+	printf "%s", $arg0->td_proc->p_comm
+	if ($arg0->td_name[0] != '\0')
+	    printf "/%s", $arg0->td_name
+	end
+	printf "\n"
+    end
+end
+
+define dumpblockedproc
+    set $td = $arg0.p_threads.tqh_first
+    while ($td != 0)
+	dumpblockedthread $td
+	set $td = $td->td_plist.tqe_next
+    end
+end
+
+define blockedtds
+    printf "  pid       tid ticks       wmesg    cmd\n"
+    ps_walker dumpblockedproc
+end
+
+document blockedtds
+Display blocked threads and how long they have been blocked.
+end
+
 set $IFF_UP = 0x1
 set $IFF_BROADCAST = 0x2
 set $IFF_LOOPBACK = 0x8
