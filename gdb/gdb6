@@ -1980,11 +1980,10 @@ define lspci
 	printf "%p: pci%d:%d:%d:%d", $_dinfo, $_dinfo->cfg.domain, \
 	    $_dinfo->cfg.bus, $_dinfo->cfg.slot, $_dinfo->cfg.func
 	if ($_dinfo->cfg.dev != 0 && $_dinfo->cfg.dev->nameunit != 0)
-        printf " (%s) %s [%x:%x]", $_dinfo->cfg.dev->nameunit, \
-        $_dinfo->cfg.dev->desc, $_dinfo->cfg.vendor,
-        $_dinfo->cfg.device
+        printf " (%s) %s", $_dinfo->cfg.dev->nameunit, \
+            $_dinfo->cfg.dev->desc
 	end
-	printf "\n"
+	printf " [%x:%x]\n", $_dinfo->cfg.vendor, $_dinfo->cfg.device
 	set $_dinfo = $_dinfo->pci_links.stqe_next
     end
 end
