@@ -96,64 +96,6 @@ if [ -n "$config" ]; then
 	config=
 elif [ $# -eq 1 ]; then
 	case "$1" in
-		mips)
-			obj=obj.mips
-			: ${ROOTFS:="/home/john/work/qemu/mips/rootfs"}
-			HOST=mips-freebsd
-			CLANG_TARGET=mips-freebsd14.0
-			CC_FLAGS="-msoft-float -mabi=32"
-			if [ -n "${USE_GCC}" ]; then
-				CC="mips-unknown-freebsd${version}-gcc"
-				CXX="mips-unknown-freebsd${version}-g++"
-				AR=/usr/bin/ar
-			fi
-			;;
-		mipsn32)
-			obj=obj.mipsn32
-			: ${ROOTFS:="/home/john/work/qemu/mipsn32/rootfs"}
-			HOST=mips64-freebsd
-			CLANG_TARGET=mips-freebsd14.0-xxx
-			CC_FLAGS="-msoft-float -mabi=n32"
-			if [ -n "${USE_GCC}" ]; then
-				CC="mips-unknown-freebsd${version}-gcc"
-				CXX="mips-unknown-freebsd${version}-g++"
-			fi
-			;;
-		mips64)
-			obj=obj.mips64
-			: ${ROOTFS:="/home/john/work/qemu/mips64/rootfs"}
-			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd14.0
-			CC_FLAGS="-msoft-float -mabi=64"
-			if [ -n "${USE_GCC}" ]; then
-				CC="mips-unknown-freebsd${version}-gcc"
-				CXX="mips-unknown-freebsd${version}-g++"
-				AR=/usr/bin/ar
-			fi
-			;;
-		cheri128)
-			obj=obj.cheri128
-			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-hybrid"}
-			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd14.0
-			# -march=mips4?
-			CC_FLAGS="-msoft-float -cheri=128 -mabi=64 \
--B /usr/local/mips-freebsd/bin"
-			CC="${CHERI_SDK}/bin/clang"
-			CXX="${CHERI_SDK}/bin/clang++"
-			AR="${CHERI_SDK}/bin/llvm-ar"
-			;;
-		mips64c)
-			obj=obj.cheriabi128
-			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-mips64-purecap"}
-			HOST=mips64-freebsd
-			CLANG_TARGET=mips64-freebsd14.0
-			CC_FLAGS="-msoft-float -cheri=128 -mabi=purecap \
--mxcaptable -B /usr/local/mips-freebsd/bin"
-			CC="${CHERI_SDK}/bin/clang"
-			CXX="${CHERI_SDK}/bin/clang++"
-			AR="${CHERI_SDK}/bin/llvm-ar"
-			;;
 		aarch64)
 			obj=obj.aarch64
 			: ${ROOTFS:="/mnt"}
