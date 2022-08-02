@@ -166,7 +166,7 @@ elif [ $# -eq 1 ]; then
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-hybrid"}
 			HOST=aarch64-freebsd
 			CLANG_TARGET=aarch64-freebsd14.0
-			CC_FLAGS="-march=morello"
+			CC_FLAGS="-march=morello -Xclang -morello-vararg=new"
 			CC="${MORELLO_SDK}/bin/clang"
 			CXX="${MORELLO_SDK}/bin/clang++"
 			AR="${MORELLO_SDK}/bin/llvm-ar"
@@ -176,7 +176,7 @@ elif [ $# -eq 1 ]; then
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-purecap"}
 			HOST=aarch64-freebsd
 			CLANG_TARGET=aarch64-freebsd14.0
-			CC_FLAGS="-march=morello+c64 -mabi=purecap -femulated-tls"
+			CC_FLAGS="-march=morello+c64 -mabi=purecap -Xclang -morello-vararg=new"
 			CC="${MORELLO_SDK}/bin/clang"
 			CXX="${MORELLO_SDK}/bin/clang++"
 			AR="${MORELLO_SDK}/bin/llvm-ar"
