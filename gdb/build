@@ -58,10 +58,13 @@ fi
 
 # Figure out some variables and set some defaults
 version=`uname -r | cut -d- -f1`
-arch=`uname -m`
+arch=`uname -p`
 case $arch in
 	amd64)
 		cfgarch=x86_64
+		;;
+	aarch64c)
+		cfgarch=aarch64
 		;;
 	*)
 		cfgarch=${arch}
@@ -72,6 +75,7 @@ esac
 # to pass to --host
 HOST=
 
+LOCALBASE=/usr/local
 CONFIGURE_ARGS=
 CONFIGURE_ENV=
 LDFLAGS=
@@ -173,6 +177,11 @@ else
 		amd64)
 			obj=obj
 			;;
+		aarch64c)
+			obj=obj.morello
+			LOCALBASE=/usr/local64
+			CC_FLAGS="-mabi=aapcs"
+			;;
 		*)
 			obj=obj.${arch}
 			;;
@@ -186,8 +195,8 @@ else
 		exit 1
 	fi
 
-	if [ -x /usr/local/bin/python -a -z "${WITHOUT_PYTHON}" ]; then
-		PYTHON="/usr/local/bin/python"
+	if [ -x ${LOCALBASE}/bin/python -a -z "${WITHOUT_PYTHON}" ]; then
+		PYTHON="${LOCALBASE}/bin/python"
 	fi
 fi
 
@@ -266,8 +275,8 @@ mkdir $obj
 CONFIGURE_ARGS="--enable-targets=all \
 --with-separate-debug-dir=/usr/lib/debug \
 --without-libunwind-ia64 --enable-tui \
---prefix=${ROOTFS}/usr/local  --mandir=${ROOTFS}/usr/local/man \
---infodir=${ROOTFS}/usr/local/info/ \
+--prefix=${ROOTFS}${LOCALBASE}  --mandir=${ROOTFS}${LOCALBASE}/man \
+--infodir=${ROOTFS}${LOCALBASE}/info/ \
 --build=${cfgarch}-portbld-freebsd${version} --disable-nls \
 --with-system-zlib --enable-64-bit-bfd ${CONFIGURE_ARGS}"
 
