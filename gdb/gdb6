@@ -4367,3 +4367,19 @@ end
 document lspmc_cpu
 Display active PMCs on each CPU.
 end
+
+define epoch_records
+    set $_ck_er = $arg0->e_epoch.records.head
+    while ($_ck_er != 0)
+	set $_er = (struct epoch_record *)$_ck_er
+	printf "gen %u CPU %u threads:\n", $_er->er_gen, $_er->er_cpuid
+	set $_et = $_er->er_tdlist.tqh_first
+	while ($_et != 0)
+	    set $_td = $_et->et_td
+	    printf "\tpid %u tid %u %s/%s\n", $_td->td_proc->p_pid, \
+	      $_td->td_tid, $_td->td_proc->p_comm, $_td->td_name
+	    set $_et = $_et->et_link.tqe_next
+	end
+	set $_ck_er = $_ck_er->next
+    end
+end
