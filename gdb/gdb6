@@ -4383,3 +4383,31 @@ define epoch_records
 	set $_ck_er = $_ck_er->next
     end
 end
+
+define malloc_zone_index
+    set $_i = 0
+    while (kmemzones[$_i].kz_size != 0)
+	set $_j = 0
+	while ($_j < numzones)
+	    if (kmemzones[$_i].kz_zone[$_j] == $arg0)
+		printf "%s: index %d\n", kmemzones[$_i].kz_name, $_j
+	    end
+	    set $_j = $_j + 1
+	end
+	set $_i = $_i + 1
+    end
+end
+
+define malloc_zone_matches
+    set $mtp = kmemstatistics
+    while ($mtp != 0)
+	if ($mtp->ks_mti.mti_zone == $arg0)
+	    printf "%s\n", $mtp->ks_shortdesc
+	end
+	set $mtp = $mtp->ks_next
+    end
+end
+
+document malloc_zone_matches
+List all the malloc types that use a given hash index.
+end
