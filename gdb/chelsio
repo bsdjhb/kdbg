@@ -244,6 +244,7 @@ set $CPL_CLOSE_CON_RPL = 0x32
 set $CPL_ISCSI_HDR = 0x33
 set $CPL_RX_DATA = 0x39
 set $CPL_RX_PKT = 0x3B
+set $CPL_RX_DDP_COMPLETE = 0x3F
 set $CPL_PASS_ESTABLISH = 0x41
 set $CPL_RX_DATA_DDP = 0x42
 set $CPL_RX_ISCSI_CMP = 0x45
@@ -303,6 +304,14 @@ define cpl
     if ($_ot->opcode == $CPL_PASS_ESTABLISH)
 	set $_cpl = (struct cpl_pass_establish *)$_ot
 	printf " (PASS_ESTABLISH)"
+    end
+    if ($_ot->opcode == $CPL_RX_DDP_COMPLETE)
+	set $_cpl = (struct cpl_rx_ddp_complete *)$_ot
+	printf " (RX_DDP_COMPLETE)"
+	bswap32 $_cpl->ddp_report $_report
+	bswap32 $_cpl->rcv_nxt $_rcv_nxt
+	printf " buf %d rcv_nxt %d", $_report & $F_DDP_BUF_IDX ? 1 : 0, \
+	    $_rcv_nxt
     end
     if ($_ot->opcode == $CPL_RX_DATA_DDP)
 	set $_cpl = (struct cpl_rx_data_ddp *)$_ot
