@@ -156,6 +156,7 @@ elif [ $# -eq 1 ]; then
 			CC="${CHERI_SDK}/bin/clang"
 			CXX="${CHERI_SDK}/bin/clang++"
 			AR="${CHERI_SDK}/bin/llvm-ar"
+			GMP_PATH="/usr/local/riscv64-hybrid"
 			;;		
 		powerpc64)
 			obj=obj.powerpc64
@@ -223,6 +224,12 @@ if [ -n "${ROOTFS}" ]; then
 	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
 	CONFIGURE_ARGS="--with-build-sysroot=${ROOTFS}"
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-rpath"
+fi
+
+if [ -n "${GMP_PATH}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-libgmp-type=static"
+	CC_FLAGS="${CC_FLAGS} -I${ROOTFS}${GMP_PATH}/include"
+	LDFLAGS="${LDFLAGS} -L${ROOTFS}${GMP_PATH}/lib"
 fi
 CC="${CC} ${CC_FLAGS}"
 CXX="${CXX} ${CC_FLAGS}"
