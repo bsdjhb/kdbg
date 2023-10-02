@@ -4288,6 +4288,7 @@ define ktrdump
 	    printf "\n"
 	    if ($_first == -1)
 		set $_first == $_cur
+	    end
 	    if ($_cur == 0)
 		set $_cur = ktr_entries - 1;
 	    else
