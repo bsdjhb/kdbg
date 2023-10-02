@@ -4412,3 +4412,20 @@ end
 document malloc_zone_matches
 List all the malloc types that use a given hash index.
 end
+
+define locks
+    set $_sl = $arg0->td_sleeplocks
+    while ($_sl != 0)
+	set $_i = $_sl->ll_count
+	while ($_i != 0)
+	    set $_le = &$_sl->ll_children[$_i - 1]
+	    printf "%s %s:%d\n", $_le->li_lock->lo_name, $_le->li_file, $_le->li_line
+	    set $_i = $_i - 1
+	end
+	set $_sl = $_sl->ll_next
+    end
+end
+
+document locks
+Display non-spin locks held by a thread (requires WITNESS)
+end
