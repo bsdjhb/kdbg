@@ -79,6 +79,8 @@ LOCALBASE=/usr/local
 CONFIGURE_ARGS=
 CONFIGURE_ENV=
 LDFLAGS=
+CFLAGS=
+CPPFLAGS=
 PYTHON=
 CHERI_SDK=/home/john/work/cheri/output/sdk
 MORELLO_SDK=/home/john/work/cheri/output/morello-sdk
@@ -209,10 +211,14 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+CFLAGS="-pipe -g -O2 -fno-strict-aliasing -fcommon"
+CFLAGS="${CFLAGS} -Wno-unused-function -Wno-unused-variable"
+
 if echo "${cc_version}" | grep -q clang ; then
 	# clang-specific warnings to disable
-	EXTRA_CFLAGS="-Wno-absolute-value -Wno-parentheses-equality"
-	EXTRA_CFLAGS="${EXTRA_CFLAGS} -Wno-unknown-warning-option"
+	CFLAGS="${CFLAGS} -Wno-absolute-value"
+	CFLAGS="${CFLAGS} -Wno-parentheses-equality"
+	CFLAGS="${CFLAGS} -Wno-unknown-warning-option"
 
 	if [ -n "${CLANG_TARGET}" ]; then
 		CC_FLAGS="-target ${CLANG_TARGET} ${CC_FLAGS}"
@@ -255,8 +261,17 @@ if [ -n "${HOST}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-source-highlight"
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-sim"
 	CONFIGURE_ENV="${CONFIGURE_ENV} gl_cv_func_gettimeofday_clobber=no"
+	if echo "$HOST" | grep -q freebsd; then
+		FREEBSD_HOST=yes
+	fi
 else
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-expat"
+	FREEBSD_HOST=yes
+fi
+
+if [ -n "${FREEBSD_HOST}" ]; then
+	CFLAGS="${CFLAGS} -DRL_NO_COMPAT -DLIBICONV_PLUG"
+	CPPFLAGS="${CPPFLAGS} -DLIBICONV_PLUG"
 fi
 
 if [ -z "${WANT_BINUTILS}" ]; then
@@ -293,9 +308,9 @@ fi
 
 (cd $obj;
  env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
-     CFLAGS="-pipe  -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
-     CPPFLAGS="-DLIBICONV_PLUG" \
-     CXXFLAGS="-pipe -DRL_NO_COMPAT -Wno-unused-function -Wno-unused-variable ${EXTRA_CFLAGS} -g -O2 -DLIBICONV_PLUG -g -fno-strict-aliasing -fcommon" \
+     CFLAGS="${CFLAGS}" \
+     CPPFLAGS="${CPPFLAGS}" \
+     CXXFLAGS="${CFLAGS}" \
      LDFLAGS="${LDFLAGS}" LIBS="" \
      INSTALL="/usr/bin/install -c " \
      INSTALL_DATA="install   -m 0644" \
