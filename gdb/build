@@ -232,7 +232,7 @@ if echo "${cc_version}" | grep -q clang ; then
 		CC_FLAGS="-target ${CLANG_TARGET} ${CC_FLAGS}"
 	fi
 	CC_FLAGS="${CC_FLAGS} ${CLANG_CC_FLAGS}"
-	: ${LDFLAGS:="-fuse-ld=lld -Wl,--gdb-index"}
+	LDFLAGS="${LDFLAGS} -fuse-ld=lld -Wl,--gdb-index"
 fi
 if [ -n "${ROOTFS}" ]; then
 	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
