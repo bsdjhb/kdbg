@@ -203,6 +203,10 @@ else
 	fi
 fi
 
+if [ -n "$OBJ" ]; then
+	obj=${OBJ}
+fi
+
 cc_version=`${CC} -v 2>&1`
 if [ $? -ne 0 ]; then
 	echo "Compilers are not executable:"
@@ -289,7 +293,7 @@ fi
 if [ -z "${WANT_WERROR}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-werror"
 fi
-	
+
 # First, make an obj tree
 mkdir $obj
 
