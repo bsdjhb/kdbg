@@ -315,6 +315,10 @@ if [ -n "${HOST}" ]; then
 	CONFIGURE_ARGS="${CONFIGURE_ARGS} --host=${HOST}"
 fi
 
+if [ -n "${TARGET}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --target=${TARGET}"
+fi
+
 (cd $obj;
  env CC_FOR_BUILD="cc" CC="${CC}" CPP="cpp" CXX="${CXX}" \
      CFLAGS="${CFLAGS}" \
