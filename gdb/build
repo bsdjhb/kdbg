@@ -109,6 +109,16 @@ elif [ $# -eq 1 ]; then
 			CLANG_TARGET=aarch64-freebsd14.0
 			AR=/usr/bin/ar
 			;;
+		linux-morello)
+			obj=obj.linux-morello
+			: ${ROOTFS:="/mnt"}
+			HOST=aarch64-linux-gnu
+			CLANG_TARGET=aarch64-linux-gnu
+			CC_FLAGS="-march=morello -Xclang -morello-vararg=new"
+			CC="${MORELLO_SDK}/bin/clang"
+			CXX="${MORELLO_SDK}/bin/clang++"
+			AR="${MORELLO_SDK}/bin/llvm-ar"
+			;;
 		morello)
 			obj=obj.morello
 			: ${ROOTFS:="/home/john/work/cheri/output/rootfs-morello-hybrid"}
@@ -232,7 +242,7 @@ if echo "${cc_version}" | grep -q clang ; then
 		CC_FLAGS="-target ${CLANG_TARGET} ${CC_FLAGS}"
 	fi
 	CC_FLAGS="${CC_FLAGS} ${CLANG_CC_FLAGS}"
-	LDFLAGS="${LDFLAGS} -fuse-ld=lld -Wl,--gdb-index"
+	LDFLAGS="${LDFLAGS} -fuse-ld=lld"
 fi
 if [ -n "${ROOTFS}" ]; then
 	CC_FLAGS="${CC_FLAGS} --sysroot=${ROOTFS}"
