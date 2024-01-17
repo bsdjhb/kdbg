@@ -118,6 +118,8 @@ elif [ $# -eq 1 ]; then
 			CC="${MORELLO_SDK}/bin/clang"
 			CXX="${MORELLO_SDK}/bin/clang++"
 			AR="${MORELLO_SDK}/bin/llvm-ar"
+			GMP_PATH="/usr/local/morello-hybrid"
+			MPFR_PATH="/usr/local/morello-hybrid"
 			;;
 		aarch64c)
 			obj=obj.aarch64c
@@ -183,6 +185,8 @@ else
 		aarch64c)
 			obj=obj.morello
 			LOCALBASE=/usr/local64
+			GMP_PATH=${LOCALBASE}
+			MPFR_PATH=${LOCALBASE}
 			CC_FLAGS="-mabi=aapcs"
 			;;
 		*)
@@ -237,9 +241,10 @@ if [ -n "${ROOTFS}" ]; then
 fi
 
 if [ -n "${GMP_PATH}" ]; then
-	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-libgmp-type=static"
-	CC_FLAGS="${CC_FLAGS} -I${ROOTFS}${GMP_PATH}/include"
-	LDFLAGS="${LDFLAGS} -L${ROOTFS}${GMP_PATH}/lib"
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-gmp=${ROOTFS}${GMP_PATH}"
+fi
+if [ -n "${MPFR_PATH}" ]; then
+	CONFIGURE_ARGS="${CONFIGURE_ARGS} --with-mpfr=${ROOTFS}${MPFR_PATH}"
 fi
 CC="${CC} ${CC_FLAGS}"
 CXX="${CXX} ${CC_FLAGS}"
