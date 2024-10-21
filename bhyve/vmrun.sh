@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# SPDX-License-Identifier: BSD-2-Clause
+#
 # Copyright (c) 2013 NetApp, Inc.
 # All rights reserved.
 #
@@ -24,7 +26,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: head/share/examples/bhyve/vmrun.sh 289001 2015-10-08 02:28:22Z marcel $
 #
 
 GRUB=/usr/local/sbin/grub-bhyve
@@ -37,8 +38,14 @@ DEFAULT_CPUS=2
 DEFAULT_TAPDEV=tap0
 DEFAULT_CONSOLE=stdio
 
+DEFAULT_NIC=virtio-net
+DEFAULT_DISK=virtio-blk
 DEFAULT_VIRTIO_DISK="./diskdev"
 DEFAULT_ISOFILE="./release.iso"
+
+DEFAULT_VNCHOST="127.0.0.1"
+DEFAULT_VNCPORT=5900
+DEFAULT_VNCSIZE="w=1024,h=768"
 
 errmsg() {
 	echo "*** $1"
@@ -47,27 +54,49 @@ errmsg() {
 usage() {
 	local msg=$1
 
-	echo "Usage: vmrun.sh [-aGhiw] [-c <CPUs>] [-C <console>] [-d <disk file>]"
-	echo "                [-e <name=value>] [-g <gdbport> ] [-H <directory>]"
+	echo "Usage: vmrun.sh [-aAEghiTuvw] [-c <CPUs>] [-C <console>]" \
+	    "[-d <disk file>]"
+	echo "                [-e <name=value>] [-f <path of firmware>]" \
+	    "[-F <size>]"
+	echo "                [-G [w][address:]port] [-H <directory>]"
 	echo "                [-I <location of installation iso>] [-l <loader>]"
-	echo "                [-m <memsize>] [-t <tapdev>] <vmname>"
+	echo "                [-L <VNC IP for UEFI framebuffer>]"
+	echo "                [-m <memsize>]" \
+	    "[-n <network adapter emulation type>]"
+	echo "                [-p <pcidev|bus/slot/func>]"
+	echo "                [-P <port>] [-t <tapdev>] <vmname>"
 	echo ""
 	echo "       -h: display this help message"
 	echo "       -a: force memory mapped local APIC access"
-	echo "       -c: number of virtual cpus (default is ${DEFAULT_CPUS})"
-	echo "       -C: console device (default is ${DEFAULT_CONSOLE})"
-	echo "       -d: virtio diskdev file (default is ${DEFAULT_VIRTIO_DISK})"
+	echo "       -A: use AHCI disk emulation instead of ${DEFAULT_DISK}"
+	echo "       -c: number of virtual cpus (default: ${DEFAULT_CPUS})"
+	echo "       -C: console device (default: ${DEFAULT_CONSOLE})"
+	echo "       -d: virtio diskdev file (default: ${DEFAULT_VIRTIO_DISK})"
 	echo "       -e: set FreeBSD loader environment variable"
-	echo "       -g: listen for connection from kgdb at <gdbport>"
-	echo "       -G: use grub-bhyve"
+	echo "       -E: Use UEFI mode (amd64 only)"
+	echo "       -f: Use a specific boot firmware (e.g., EDK2, U-Boot)"
+	echo "       -F: Use a custom UEFI GOP framebuffer size" \
+	    "(default: ${DEFAULT_VNCSIZE}) (amd64 only)"
+	echo "       -g: Use grub-bhyve (amd64 only)"
+	echo "       -G: bind the GDB stub to the specified address"
 	echo "       -H: host filesystem to export to the loader"
 	echo "       -i: force boot of the Installation CDROM image"
-	echo "       -I: Installation CDROM image location (default is ${DEFAULT_ISOFILE})"
-	echo "       -l: the OS loader to use (default is /boot/userboot.so)"
-	echo "       -m: memory size (default is ${DEFAULT_MEMSIZE})"
-	echo "       -p: pass-through a host PCI device at bus/slot/func (e.g. 10/0/0)"
-	echo "       -t: tap device for virtio-net (default is $DEFAULT_TAPDEV)"
-	echo "       -w: ignore accesses to unimplemented MSRs"
+	echo "       -I: Installation CDROM image location" \
+	    "(default: ${DEFAULT_ISOFILE})"
+	echo "       -l: the OS loader to use (default: /boot/userboot.so) (amd64 only)"
+	echo "       -L: IP address for UEFI GOP VNC server" \
+	    "(default: ${DEFAULT_VNCHOST})"
+	echo "       -m: memory size (default: ${DEFAULT_MEMSIZE})"
+	echo "       -n: network adapter emulation type" \
+	    "(default: ${DEFAULT_NIC})"
+	echo "       -p: pass-through a host PCI device (e.g ppt0 or" \
+	    "bus/slot/func) (amd64 only)"
+	echo "       -P: UEFI GOP VNC port (default: ${DEFAULT_VNCPORT})"
+	echo "       -t: tap device for virtio-net (default: $DEFAULT_TAPDEV)"
+	echo "       -T: Enable tablet device (for UEFI GOP) (amd64 only)"
+	echo "       -u: RTC keeps UTC time"
+	echo "       -v: Wait for VNC client connection before booting VM"
+	echo "       -w: ignore unimplemented MSRs (amd64 only)"
 	echo ""
 	[ -n "$msg" ] && errmsg "$msg"
 	exit 1
@@ -84,23 +113,55 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+platform=$(uname -m)
+if [ "${platform}" != amd64 -a "${platform}" != arm64 ]; then
+	errmsg "This script is only supported on amd64 and arm64 platforms"
+	exit 1
+fi
+
 force_install=0
 isofile=${DEFAULT_ISOFILE}
 memsize=${DEFAULT_MEMSIZE}
 console=${DEFAULT_CONSOLE}
 cpus=${DEFAULT_CPUS}
+nic=${DEFAULT_NIC}
 tap_total=0
 disk_total=0
-gdbport=0
+disk_emulation=${DEFAULT_DISK}
 loader_opt=""
-bhyverun_opt="-H -A -P"
 pass_total=0
 use_grub=
 
-while getopts ac:C:d:e:g:GhH:iI:l:m:p:t:w c ; do
+# EFI-specific options
+efi_mode=0
+efi_firmware="/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
+vncwait=""
+vnchost=${DEFAULT_VNCHOST}
+vncport=${DEFAULT_VNCPORT}
+vncsize=${DEFAULT_VNCSIZE}
+tablet=""
+
+# arm64 only
+uboot_firmware="/usr/local/share/u-boot/u-boot-bhyve-arm64/u-boot.bin"
+
+case ${platform} in
+amd64)
+	bhyverun_opt="-H -P"
+	opts="aAc:C:d:e:Ef:F:gG:hH:iI:l:L:m:n:p:P:t:Tuvw"
+	;;
+arm64)
+	bhyverun_opt=""
+	opts="aAc:C:d:e:f:F:G:hH:iI:L:m:n:P:t:uv"
+	;;
+esac
+
+while getopts $opts c ; do
 	case $c in
 	a)
 		bhyverun_opt="${bhyverun_opt} -a"
+		;;
+	A)
+		disk_emulation="ahci-hd"
 		;;
 	c)
 		cpus=${OPTARG}
@@ -118,11 +179,20 @@ while getopts ac:C:d:e:g:GhH:iI:l:m:p:t:w c ; do
 	e)
 		loader_opt="${loader_opt} -e ${OPTARG}"
 		;;
-	g)	
-		gdbport=${OPTARG}
+	E)
+		efi_mode=1
+		;;
+	f)
+		firmware="${OPTARG}"
+		;;
+	F)
+		vncsize="${OPTARG}"
+		;;
+	g)
+		use_grub=1
 		;;
 	G)
-		use_grub=1
+		bhyverun_opt="${bhyverun_opt} -G ${OPTARG}"
 		;;
 	H)
 		host_base=`realpath ${OPTARG}`
@@ -136,16 +206,34 @@ while getopts ac:C:d:e:g:GhH:iI:l:m:p:t:w c ; do
 	l)
 		loader_opt="${loader_opt} -l ${OPTARG}"
 		;;
+	L)
+		vnchost="${OPTARG}"
+		;;
 	m)
 		memsize=${OPTARG}
+		;;
+	n)
+		nic=${OPTARG}
 		;;
 	p)
 		eval "pass_dev${pass_total}=\"${OPTARG}\""
 		pass_total=$(($pass_total + 1))
 		;;
+	P)
+		vncport="${OPTARG}"
+		;;
 	t)
 		eval "tap_dev${tap_total}=\"${OPTARG}\""
 		tap_total=$(($tap_total + 1))
+		;;
+	T)
+		tablet="-s 30,xhci,tablet"
+		;;
+	u)	
+		bhyverun_opt="${bhyverun_opt} -u"
+		;;
+	v)
+		vncwait=",wait"
 		;;
 	w)
 		bhyverun_opt="${bhyverun_opt} -w"
@@ -181,6 +269,32 @@ fi
 if [ ${pass_total} -gt 0 ]; then
 	loader_opt="${loader_opt} -S"
 	bhyverun_opt="${bhyverun_opt} -S"
+fi
+
+if [ ${efi_mode} -eq 1 -a -n "$use_grub" ]; then
+	echo "Error: both EFI and grub enabled"
+	exit 1
+fi
+
+if [ -z "$firmware" ]; then
+	case ${platform} in
+	amd64)
+		firmware="${efi_firmware}"
+		firmware_pkg="edk2-bhyve"
+		;;
+	arm64)
+		firmware="${uboot_firmware}"
+		firmware_pkg="u-boot-bhyve-arm64"
+		;;
+	esac
+fi
+
+if [ -n "${firmware}" -a ! -f "${firmware}" ]; then
+	echo "Error: Firmware file ${firmware} doesn't exist."
+	if [ -n "${firmware_pkg}" ]; then
+		echo "       Try: pkg install ${firmware_pkg}"
+	fi
+	exit 1
 fi
 
 make_and_check_diskdev()
@@ -219,7 +333,8 @@ while [ 1 ]; do
 	file -s ${first_diskdev} | grep "boot sector" > /dev/null
 	rc=$?
 	if [ $rc -ne 0 ]; then
-		file -s ${first_diskdev} | grep ": Unix Fast File sys" > /dev/null
+		file -s ${first_diskdev} | \
+		    grep ": Unix Fast File sys" > /dev/null
 		rc=$?
 	fi
 	if [ $rc -ne 0 ]; then
@@ -259,53 +374,86 @@ while [ 1 ]; do
 		installer_opt=""
 	fi
 
-	if [ -n "$use_grub" ]; then
-		if [ "${console}" != "stdio" ]; then
-			loader_opt="${loader_opt} -c ${console}"
+	if [ ${platform} = amd64 -a ${efi_mode} -eq 0 ]; then
+		if [ -n "$use_grub" ]; then
+			if [ "${console}" != "stdio" ]; then
+				loader_opt="${loader_opt} -c ${console}"
+			fi
+			${GRUB} -M ${memsize} -m ${device_map} \
+			    ${loader_opt} ${vmname}
+			rm ${device_map}
+			device_map=
+		else
+			${LOADER} -c ${console} -m ${memsize} ${BOOTDISKS} \
+			    ${loader_opt} ${vmname}
 		fi
-		${GRUB} -M ${memsize} -m ${device_map} \
-			${loader_opt} ${vmname}
-		rm ${device_map}
-		device_map=
-	else
-		${LOADER} -c ${console} -m ${memsize} ${BOOTDISKS} \
-			  ${loader_opt} ${vmname}
-	fi
-	bhyve_exit=$?
-	if [ $bhyve_exit -ne 0 ]; then
-		break
+		bhyve_exit=$?
+		if [ $bhyve_exit -ne 0 ]; then
+			break
+		fi
 	fi
 
 	#
 	# Build up args for additional tap and disk devices now.
 	#
-	nextslot=2  # slot 0 is hostbridge, slot 1 is lpc
-	devargs=""  # accumulate disk/tap args here
-	i=0
-	while [ $i -lt $tap_total ] ; do
-	    eval "tapname=\$tap_dev${i}"
-	    devargs="$devargs -s $nextslot:0,virtio-net,${tapname} "
-	    nextslot=$(($nextslot + 1))
-	    i=$(($i + 1))
-	done
+	devargs="-s 0:0,hostbridge"  # accumulate disk/tap args here
+	case ${platform} in
+	amd64)
+		console_opt="-l com1,${console}"
+		devargs="$devargs -s 1:0,lpc "
+		nextslot=2  # slot 0 is hostbridge, slot 1 is lpc
+		;;
+	arm64)
+		console_opt="-o console=${console}"
+		devargs="$devargs -o bootrom=${firmware} "
+		nextslot=1  # slot 0 is hostbridge
+		;;
+	esac
 
 	i=0
 	while [ $i -lt $disk_total ] ; do
 	    eval "disk=\$disk_dev${i}"
 	    eval "opts=\$disk_opts${i}"
 	    make_and_check_diskdev "${disk}"
-	    devargs="$devargs -s $nextslot:0,virtio-blk,${disk}${opts} "
+	    devargs="$devargs -s $nextslot:0,$disk_emulation,${disk}${opts} "
+	    nextslot=$(($nextslot + 1))
+	    i=$(($i + 1))
+	done
+
+	i=0
+	while [ $i -lt $tap_total ] ; do
+	    eval "tapname=\$tap_dev${i}"
+	    devargs="$devargs -s $nextslot:0,${nic},${tapname} "
 	    nextslot=$(($nextslot + 1))
 	    i=$(($i + 1))
 	done
 
 	i=0
 	while [ $i -lt $pass_total ] ; do
-	    eval "pass=\$pass_dev${i}"
-	    devargs="$devargs -s $nextslot:0,passthru,${pass} "
-	    nextslot=$(($nextslot + 1))
-	    i=$(($i + 1))
+		eval "pass=\$pass_dev${i}"
+		bsfform="$(echo "${pass}" | grep "^[0-9]\+/[0-9]\+/[0-9]\+$")"
+		if [ -z "${bsfform}" ]; then
+			bsf="$(pciconf -l "${pass}" 2>/dev/null)"
+			if [ $? -ne 0 ]; then
+				errmsg "${pass} is not a host PCI device"
+				exit 1
+			fi
+			bsf="$(echo "${bsf}" | awk -F: '{print $2"/"$3"/"$4}')"
+		else
+			bsf="${pass}"
+		fi
+		devargs="$devargs -s $nextslot:0,passthru,${bsf} "
+		nextslot=$(($nextslot + 1))
+		i=$(($i + 1))
         done
+
+	efiargs=""
+	if [ ${efi_mode} -gt 0 ]; then
+		efiargs="-s 29,fbuf,tcp=${vnchost}:${vncport},"
+		efiargs="${efiargs}${vncsize}${vncwait}"
+		efiargs="${efiargs} -l bootrom,${firmware}"
+		efiargs="${efiargs} ${tablet}"
+	fi
 
 	if kldstat -qm nmdm; then
 	    devargs="$devargs -l com2,/dev/nmdm${vmname}2B "
@@ -314,11 +462,9 @@ while [ 1 ]; do
 	nextslot=$(($nextslot + 1))
 
 	${FBSDRUN} -c ${cpus} -m ${memsize} ${bhyverun_opt}		\
-		-G ${gdbport}						\
-		-s 0:0,hostbridge					\
-		-s 1:0,lpc						\
+		${efiargs}						\
 		${devargs}						\
-		-l com1,${console}					\
+		${console_opt}						\
 		${installer_opt}					\
 		${vmname}
 
