@@ -182,17 +182,19 @@ else
     set $arch = (char *)((struct sysctl_oid *)__set_sysctl_set_sym_sysctl___kern_supported_archs )->oid_arg1
 end
 
-if ($arch[0] == 'a' && $arch[1] == 'm' && $arch[2] == 'd')
-    source gdb6.amd64
-    set $__amd64__ = 1
-end
-if ($arch[0] == 'i' && $arch[1] == '3' && $arch[2] == '8')
-    source gdb6.i386
-    set $__i386__ = 1
-end
-if ($arch[0] == 'r' && $arch[1] == 'i' && $arch[2] == 's')
-    source gdb6.riscv
-    set $__riscv__ = 1
+if ($arch != 0)
+    if ($arch[0] == 'a' && $arch[1] == 'm' && $arch[2] == 'd')
+	source gdb6.amd64
+	set $__amd64__ = 1
+    end
+    if ($arch[0] == 'i' && $arch[1] == '3' && $arch[2] == '8')
+	source gdb6.i386
+	set $__i386__ = 1
+    end
+    if ($arch[0] == 'r' && $arch[1] == 'i' && $arch[2] == 's')
+	source gdb6.riscv
+	set $__riscv__ = 1
+    end
 end
 
 
